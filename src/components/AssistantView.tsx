@@ -304,6 +304,10 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
           callers,
           morningMessage,
           pendingIntent,
+          conversationHistory: messages.slice(-12).map((message) => ({
+            role: message.sender,
+            text: message.text,
+          })),
         });
 
         // Stage every SMS for review; do not execute it on the first pass.
