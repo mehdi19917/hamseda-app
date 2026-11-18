@@ -44,26 +44,41 @@ jobs:
           npm run build
           npx cap sync android
 
+
       - name: Build Debug APK
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+
+          for attempt in 1 2 3; do
+            echo "Build attempt $attempt"
+
+            if ./gradlew assembleDebug --no-daemon; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              echo "Build failed. Retrying in $((attempt * 30)) seconds..."
+              sleep $((attempt * 30))
+            fi
+          done
+
+          exit 1
 
       - name: Rename APK for easy installation
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk roozhaye-man-o-zari.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk hamseda.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: roozhaye-man-o-zari-apk
-          path: roozhaye-man-o-zari.apk
+          name: hamseda-apk
+          path: hamseda.apk
 
       - name: Publish Latest APK to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-apk
-          name: روزهای من و زری - آخرین نسخه APK
-          body: فایل نصبی اندروید (APK) آماده نصب روی گوشی شیائومی و گوشی زری
-          files: roozhaye-man-o-zari.apk
+          name: هم‌صدا - آخرین نسخه APK
+          body: فایل نصبی اپلیکیشن هم‌صدا
+          files: hamseda.apk
           overwrite_files: true
