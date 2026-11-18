@@ -105,6 +105,7 @@ interface RoozhayeNativePlugin {
   listenOncePersian(): Promise<{
     ok: boolean;
     transcript?: string;
+    transcripts?: string[];
     permissionRequired?: boolean;
     errorCode?: number;
     error?: string;
@@ -534,6 +535,7 @@ export async function setDeviceIdentityNative(options: {
 export async function listenOncePersianNative(): Promise<{
   ok: boolean;
   transcript?: string;
+  transcripts?: string[];
   permissionRequired?: boolean;
   errorCode?: number;
   error?: string;
