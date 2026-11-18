@@ -108,7 +108,21 @@ export function findBestContactMatch(
     }
   }
 
-  if (bestContact) return bestContact;
+  // Never turn a weak phonetic resemblance into a real-world action.
+  // A contact must be an exact or strong prefix match, and the best result must be unique.
+  if (bestContact && bestScore >= 85) {
+    const equallyGood = syncedContacts.filter((contact) => {
+      if (!contact.phone?.trim()) return false;
+      const fields = [contact.name, contact.persianPhonetic]
+        .map((f) => normalizeAssistantText(f || ''))
+        .filter(Boolean);
+      return fields.some((f) =>
+        candidateNames.some((q) => q && (f === q ? 100 : f.startsWith(q) || q.startsWith(f) ? 85 : 0) === bestScore)
+      );
+    });
+    const uniquePhones = new Set(equallyGood.map((contact) => normalizePhoneDigits(contact.phone)));
+    if (uniquePhones.size === 1) return bestContact;
+  }
 
   // 3. Fallback: check saved CallerContacts and cross-match to syncedContacts if available
   for (const caller of callers) {
@@ -694,19 +708,26 @@ export async function processAssistantUtterance(
     }
 
     const result = parsed.data;
-    // Safety net: resolve phone from syncedContacts if AI returned targetName without phone
-    if (
-      (result.action === 'make_call' || result.action === 'send_sms' || result.action === 'ask_sms_body') &&
+    // Calls are high-impact: never trust an AI-guessed phone number.
+    // Re-resolve the spoken recipient against the local contact book with a strict match.
+    if (result.action === 'make_call') {
+      const match = result.targetName
+        ? findBestContactMatch(result.targetName, ctx.syncedContacts, ctx.callers, ctx.settings, ctx.deviceOwner)
+        : null;
+      if (!match?.phone) {
+        return {
+          action: 'answer',
+          replyText: `برای اینکه با شخص اشتباهی تماس نگیرم، مخاطب را دقیق پیدا نکردم. گفتی «${result.targetName || cleanedUtterance}». لطفاً اسم مخاطب را دوباره و واضح بگو.`,
+        };
+      }
+      result.targetName = match.name;
+      result.targetPhone = match.phone;
+    } else if (
+      (result.action === 'send_sms' || result.action === 'ask_sms_body') &&
       result.targetName &&
       !result.targetPhone
     ) {
-      const match = findBestContactMatch(
-        result.targetName,
-        ctx.syncedContacts,
-        ctx.callers,
-        ctx.settings,
-        ctx.deviceOwner
-      );
+      const match = findBestContactMatch(result.targetName, ctx.syncedContacts, ctx.callers, ctx.settings, ctx.deviceOwner);
       if (match) {
         result.targetName = match.name;
         result.targetPhone = match.phone;
