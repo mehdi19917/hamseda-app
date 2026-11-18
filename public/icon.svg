@@ -1,18 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <linearGradient id="bg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#12A879"/>
-      <stop offset="1" stop-color="#064E3B"/>
+    <linearGradient id="bg" x1="56" y1="24" x2="456" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0E8D68"/>
+      <stop offset="1" stop-color="#052F27"/>
     </linearGradient>
-    <linearGradient id="wave" x1="112" y1="132" x2="400" y2="382" gradientUnits="userSpaceOnUse">
+    <linearGradient id="mic" x1="184" y1="108" x2="328" y2="404" gradientUnits="userSpaceOnUse">
       <stop stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#C7F9E8"/>
+      <stop offset="1" stop-color="#C8FFE9"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="116" fill="url(#bg)"/>
-  <path d="M256 78c-91 0-165 68-165 153 0 47 24 88 63 116l-16 75 91-40c9 1 18 2 27 2 91 0 165-68 165-153S347 78 256 78Z" fill="#FFFFFF" fill-opacity=".12" stroke="#FFFFFF" stroke-opacity=".3" stroke-width="8"/>
-  <rect x="222" y="150" width="68" height="145" rx="34" fill="url(#wave)"/>
-  <path d="M184 257v17c0 41 32 74 72 74s72-33 72-74v-17M256 348v42M218 390h76" stroke="url(#wave)" stroke-width="19" stroke-linecap="round"/>
-  <path d="M157 224c-14 21-22 46-22 73M355 224c14 21 22 46 22 73" stroke="#A7F3D0" stroke-width="15" stroke-linecap="round"/>
-  <path d="M112 198c-24 31-38 69-38 109M400 198c24 31 38 69 38 109" stroke="#6EE7B7" stroke-width="12" stroke-linecap="round" opacity=".9"/>
+  <circle cx="256" cy="256" r="190" stroke="#8CF5CE" stroke-opacity=".12" stroke-width="10"/>
+  <path d="M145 192c-42 48-42 116 0 164M367 192c42 48 42 116 0 164" stroke="#74EAC0" stroke-width="20" stroke-linecap="round"/>
+  <path d="M105 150c-66 76-66 172 0 248M407 150c66 76 66 172 0 248" stroke="#42D5A5" stroke-width="15" stroke-linecap="round" opacity=".9"/>
+  <rect x="211" y="104" width="90" height="204" rx="45" fill="url(#mic)"/>
+  <path d="M166 247v18c0 50 40 90 90 90s90-40 90-90v-18" stroke="url(#mic)" stroke-width="22" stroke-linecap="round"/>
+  <path d="M256 355v54M210 409h92" stroke="url(#mic)" stroke-width="22" stroke-linecap="round"/>
 </svg>
