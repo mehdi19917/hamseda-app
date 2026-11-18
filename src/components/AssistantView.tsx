@@ -196,7 +196,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
 }) => {
   const selfName = getSelfName(settings, deviceOwner);
   const partnerOtherName = getPartnerNameForDevice(settings, deviceOwner);
-  const assistantName = settings.assistantName?.trim() || 'آوا';
+  const assistantName = settings.assistantName?.trim() || 'هم‌صدا';
   const wakeLoopEnabled = Boolean(settings.assistantWakeWordEnabled);
 
   const [assistantNameDraft, setAssistantNameDraft] = useState(assistantName);
@@ -224,7 +224,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
 
   // Sync draft when settings.assistantName updates
   useEffect(() => {
-    setAssistantNameDraft(settings.assistantName?.trim() || 'آوا');
+    setAssistantNameDraft(settings.assistantName?.trim() || 'هم‌صدا');
   }, [settings.assistantName]);
 
   useEffect(() => {
@@ -579,7 +579,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
 
   const handleSaveAssistantName = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleaned = assistantNameDraft.trim() || 'آوا';
+    const cleaned = assistantNameDraft.trim() || 'هم‌صدا';
     onUpdateSettings({assistantName: cleaned});
     setNameSavedFlash(true);
     onStatusToast(`نام دستیار به «${cleaned}» تغییر کرد. از این به بعد با همین نام صدایش بزنید.`);
