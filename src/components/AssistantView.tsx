@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import {toPersianDigits} from '../data/persianLibrary';
 import {
+  parseOfflineAssistantCommand,
   processAssistantUtterance,
   type PendingAssistantIntent,
 } from '../services/assistantEngine';
@@ -500,8 +501,50 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
         const res = await listenOncePersianNative();
         if (res.permissionRequired) {
           onStatusToast('لطفاً مجوز میکروفون را برای استفاده از دستیار صوتی تایید کنید.');
-        } else if (res.ok && res.transcript?.trim()) {
-          await executeUtterance(res.transcript.trim(), true);
+        } else if (res.ok && (res.transcripts?.length || res.transcript?.trim())) {
+          // Android returns N-best Persian hypotheses. Prefer the hypothesis that
+          // resolves to a real local contact for call commands instead of blindly
+          // executing Google's first guess (which can turn "Zari" into another word).
+          const alternatives = Array.from(new Set(
+            (res.transcripts?.length ? res.transcripts : [res.transcript || ''])
+              .map((value) => value.trim())
+              .filter(Boolean)
+          ));
+          const context = {
+            settings,
+            deviceOwner,
+            isOnline,
+            syncedContacts,
+            callers,
+            morningMessage,
+            pendingIntent,
+          };
+          const evaluated = alternatives.map((transcript) => ({
+            transcript,
+            result: parseOfflineAssistantCommand(transcript, context),
+          }));
+          const resolvedCalls = evaluated.filter(
+            (item) => item.result?.action === 'make_call' && item.result.targetPhone
+          );
+          const resolvedPhones = new Set(resolvedCalls.map((item) => item.result?.targetPhone));
+          if (resolvedPhones.size > 1) {
+            const reply = 'دو برداشت متفاوت از نام مخاطب شنیدم. برای اینکه با شخص اشتباهی تماس نگیرم، لطفاً فقط نام مخاطب را دوباره و شمرده بگو.';
+            appendMessage('assistant', reply);
+            if (autoSpeakReplies) onSpeakText(reply, `پاسخ ${assistantName}`, 'custom');
+          } else if (resolvedCalls.length > 0) {
+            await executeUtterance(resolvedCalls[0].transcript, true);
+          } else {
+            const callLike = evaluated.find((item) =>
+              /(تماس بگیر|زنگ بزن|شماره بگیر|شماره‌گیری|تلفن بزن|تلفن کن)/.test(item.transcript)
+            );
+            const recognizedCommand = evaluated.find(
+              (item) => item.result && item.result.action !== 'answer'
+            );
+            await executeUtterance(
+              (callLike || recognizedCommand || evaluated[0]).transcript,
+              true
+            );
+          }
         } else if (res.error && res.errorCode !== 6 && res.errorCode !== 7) {
           onStatusToast(res.error);
         } else {
