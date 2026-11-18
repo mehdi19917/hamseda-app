@@ -254,7 +254,7 @@ export const SyncSettingsView: React.FC<SyncSettingsViewProps> = ({
     try {
       await navigator.clipboard.writeText(spaceInfo.spaceId);
       setCopiedSpace(true);
-      onStatusToast('کد فضای مشترک کپی شد. می‌توانید برای زری بفرستید.');
+      onStatusToast('کد فضای مشترک کپی شد. می‌توانید برای همراهتان بفرستید.');
       setTimeout(() => setCopiedSpace(false), 2500);
     } catch {
       onStatusToast('لطفاً کد فضای مشترک را دستی کپی کنید.');
@@ -768,7 +768,7 @@ export const SyncSettingsView: React.FC<SyncSettingsViewProps> = ({
         {nativeCaps.isNative && (!nativeCaps.sms || !nativeCaps.notificationListener) && (
           <div className="rounded-xl bg-amber-50 dark:bg-amber-950/35 border border-amber-300 dark:border-amber-800 p-4 sm:p-5 space-y-3">
             <div className="text-xs sm:text-sm font-extrabold text-amber-950 dark:text-amber-200">
-              رفع قفل «تنظیمات محدودشده / Restricted setting» برای خواندن پیامک در گوشی زری (اندروید ۱۳ تا ۱۶)
+              رفع قفل «تنظیمات محدودشده / Restricted setting» برای خواندن پیامک در گوشی همراه (اندروید ۱۳ تا ۱۶)
             </div>
             <p className="text-xs leading-6 text-amber-900 dark:text-amber-100/90">
               چون برنامه از بیرون گوگل‌پلی نصب شده، اندروید ابتدا اجازه پیامک و اعلان را قفل می‌کند و لینک راهنمای گوگل را نشان می‌دهد. با این ۳ قدم ساده قفل آن برای همیشه باز می‌شود:
@@ -1089,7 +1089,7 @@ export const SyncSettingsView: React.FC<SyncSettingsViewProps> = ({
               type="text"
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="عنوان (مثلاً پیام صبحگاهی زری)"
+              placeholder="عنوان (مثلاً پیام صبحگاهی)"
               className="lg:col-span-2 min-h-[44px] px-3.5 rounded-xl border border-slate-200 dark:border-emerald-900 bg-white dark:bg-[#121E1C] text-xs sm:text-sm text-slate-900 dark:text-white"
             />
 
