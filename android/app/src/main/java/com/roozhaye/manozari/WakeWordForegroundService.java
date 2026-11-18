@@ -180,13 +180,44 @@ public class WakeWordForegroundService extends Service {
             if (recognizer == null) {
                 recognizer = SpeechRecognizer.createSpeechRecognizer(getApplicationContext());
                 recognizer.setRecognitionListener(new RecognitionListener() {
-                @Override public void onReadyForSpeech(Bundle params) {}
-                @Override public void onBeginningOfSpeech() {}
-                @Override public void onRmsChanged(float rmsdB) {}
-                @Override public void onBufferReceived(byte[] buffer) {}
-                @Override public void onEndOfSpeech() {}
-                @Override public void onPartialResults(Bundle partialResults) {}
-                @Override public void onEvent(int eventType, Bundle params) {}
+                    @Override public void onReadyForSpeech(Bundle params) {}
+                    @Override public void onBeginningOfSpeech() {}
+                    @Override public void onRmsChanged(float rmsdB) {}
+                    @Override public void onBufferReceived(byte[] buffer) {}
+                    @Override public void onEndOfSpeech() {}
+                    @Override public void onPartialResults(Bundle partialResults) {}
+                    @Override public void onEvent(int eventType, Bundle params) {}
+
+                    @Override public void onError(int error) {
+                        // Restart only the recognition session, not the recognizer service object.
+                        restartRecognition(error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ? 1800 : 500);
+                    }
+
+                    @Override public void onResults(Bundle results) {
+                        ArrayList<String> matches = results == null ? null
+                                : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                        String spoken = matches == null || matches.isEmpty() ? "" : matches.get(0).trim();
+
+                        if (awaitingCommand) {
+                            awaitingCommand = false;
+                            if (!spoken.isEmpty()) savePendingCommand(spoken);
+                            restartRecognition(350);
+                            return;
+                        }
+
+                        if (containsWakeWord(spoken)) {
+                            onWakeWordHeard();
+                            String command = extractCommandAfterWakeWord(spoken);
+                            if (!command.isEmpty()) {
+                                savePendingCommand(command);
+                            } else {
+                                awaitingCommand = true;
+                                speakWakePrompt();
+                                return;
+                            }
+                        }
+                        restartRecognition(350);
+                    }
                 });
             }
 
