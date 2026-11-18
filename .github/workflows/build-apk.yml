@@ -45,6 +45,13 @@ jobs:
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
 
+      - name: Configure persistent debug signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          base64 --decode android/debug-signing-key.b64 > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey
+
       - name: Install dependencies and build web bundle
         run: |
           npm install --legacy-peer-deps
