@@ -94,6 +94,13 @@
         </activity>
 
         <service
+            android:name=".WakeWordForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone"
+            android:stopWithTask="false" />
+
+        <service
             android:name=".KeepAliveForegroundService"
             android:enabled="true"
             android:exported="false"
