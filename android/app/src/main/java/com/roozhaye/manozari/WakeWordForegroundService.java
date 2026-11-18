@@ -129,7 +129,7 @@ public class WakeWordForegroundService extends Service {
         open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pending = PendingIntent.getActivity(this, 712, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_rmz)
                 .setContentTitle("هم‌صدا · گوش‌به‌زنگ")
                 .setContentText(message)
@@ -137,9 +137,11 @@ public class WakeWordForegroundService extends Service {
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setProgress(100, Math.max(0, Math.min(100, progress)), indeterminate)
-                .build();
+                .setPriority(NotificationCompat.PRIORITY_LOW);
+        if (indeterminate || progress > 0) {
+            builder.setProgress(100, Math.max(0, Math.min(100, progress)), indeterminate);
+        }
+        return builder.build();
     }
 
     private void updateNotification(String message) {
