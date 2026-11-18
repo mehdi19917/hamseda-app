@@ -253,10 +253,19 @@ public class RoozhayeNativePlugin extends Plugin {
                         ArrayList<String> matches = results != null
                                 ? results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                                 : null;
-                        String transcript = (matches != null && !matches.isEmpty()) ? matches.get(0).trim() : "";
+                        ArrayList<String> transcripts = new ArrayList<>();
+                        if (matches != null) {
+                            for (String match : matches) {
+                                if (match != null && !match.trim().isEmpty() && !transcripts.contains(match.trim())) {
+                                    transcripts.add(match.trim());
+                                }
+                            }
+                        }
+                        String transcript = !transcripts.isEmpty() ? transcripts.get(0) : "";
                         JSObject ret = new JSObject();
                         ret.put("ok", !transcript.isEmpty());
                         ret.put("transcript", transcript);
+                        ret.put("transcripts", new JSONArray(transcripts));
                         if (transcript.isEmpty()) {
                             ret.put("error", "صدایی شنیده نشد.");
                         }
@@ -268,7 +277,7 @@ public class RoozhayeNativePlugin extends Plugin {
                 intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
                 intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR");
                 intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR");
-                intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+                intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
                 intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
                 intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 10000L);
                 intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 7000L);
