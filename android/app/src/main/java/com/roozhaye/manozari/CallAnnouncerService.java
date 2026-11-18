@@ -69,6 +69,9 @@ public class CallAnnouncerService extends Service {
     }
 
     public static void announce(Context context, String title, String text, String voiceName, boolean isMale, int repeatCount, boolean isCall) {
+        // All native announcements use Negin, including incoming calls and SMS.
+        voiceName = "Kore";
+        isMale = false;
         final Context appCtx = context.getApplicationContext();
         final int safeRepeat = Math.max(1, Math.min(2, repeatCount));
         Intent intent = new Intent(appCtx, CallAnnouncerService.class);
@@ -284,8 +287,8 @@ public class CallAnnouncerService extends Service {
         String title = intent != null ? intent.getStringExtra(EXTRA_TITLE) : "اعلام صوتی";
         String rawText = intent != null ? intent.getStringExtra(EXTRA_TEXT) : "";
         String text = rawText != null ? rawText.trim() : "";
-        boolean isMale = intent != null && intent.getBooleanExtra(EXTRA_IS_MALE, false);
-        String extraVoice = intent != null ? intent.getStringExtra(EXTRA_VOICE_NAME) : null;
+        boolean isMale = false;
+        String extraVoice = "Kore";
         int repeat = intent != null ? Math.max(1, Math.min(2, intent.getIntExtra(EXTRA_REPEAT, 1))) : 1;
         boolean isCall = intent != null && intent.getBooleanExtra(EXTRA_IS_CALL, false);
 
