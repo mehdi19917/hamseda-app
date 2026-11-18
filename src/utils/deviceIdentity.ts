@@ -84,8 +84,8 @@ export function getPartnerNameForDevice(
   settings: Pick<AppSettings, 'myName' | 'partnerName'>,
   deviceOwner: DeviceOwner
 ): string {
-  const man = settings.myName?.trim() || 'بهمن';
-  const zari = settings.partnerName?.trim() || 'زری';
+  const man = settings.myName?.trim() || 'من';
+  const zari = settings.partnerName?.trim() || 'همراه';
   return deviceOwner === 'zari' ? man : zari;
 }
 
@@ -111,10 +111,10 @@ export function adaptTextForDevice(
   deviceOwner: DeviceOwner
 ): string {
   if (!text) return text;
-  const man = settings.myName?.trim() || 'بهمن';
-  const zari = settings.partnerName?.trim() || 'زری';
+  const man = settings.myName?.trim() || 'من';
+  const zari = settings.partnerName?.trim() || 'همراه';
   if (deviceOwner !== 'zari') {
-    return text.replace(/من و زری/g, `${man} و ${zari}`);
+    return text.replace(/من و همراه/g, `${man} و ${zari}`);
   }
   return text
     .replace(new RegExp(`${man} و ${zari}`, 'g'), `${zari} و ${man}`)
@@ -125,7 +125,7 @@ export function adaptTextForDevice(
     .replace(new RegExp(`زحمات امروز ${zari}`, 'g'), `زحمات امروز ${man}`)
     .replace(new RegExp(`${zari} جان،`, 'g'), `${man} جان،`)
     .replace(new RegExp(`حضور گرم ${zari}`, 'g'), `حضور گرم ${man}`)
-    .replace(/من و زری/g, `${zari} و ${man}`);
+    .replace(/من و همراه/g, `${zari} و ${man}`);
 }
 
 export function normalizeAssistantText(raw: string): string {
