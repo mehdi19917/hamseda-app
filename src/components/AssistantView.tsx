@@ -51,7 +51,6 @@ import type {
   SyncedPhoneContact,
 } from '../types/app';
 import {
-  extractCommandAfterWakeWord,
   getPartnerNameForDevice,
   getSelfName,
 } from '../utils/deviceIdentity';
