@@ -2,7 +2,7 @@ import type {CapacitorConfig} from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.roozhaye.manozari',
-  appName: 'روزهای من و زری',
+  appName: 'هم‌صدا',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
