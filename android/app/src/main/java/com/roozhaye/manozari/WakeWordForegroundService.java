@@ -173,11 +173,13 @@ public class WakeWordForegroundService extends Service {
             return;
         }
 
-        final boolean commandMode = awaitingCommand;
-        destroyRecognizer();
         try {
-            recognizer = SpeechRecognizer.createSpeechRecognizer(getApplicationContext());
-            recognizer.setRecognitionListener(new RecognitionListener() {
+            // Keep one SpeechRecognizer instance alive for the whole wake-word session.
+            // Android recognition is still session-based, but reusing the engine avoids
+            // repeatedly tearing down and recreating the recognizer after every phrase.
+            if (recognizer == null) {
+                recognizer = SpeechRecognizer.createSpeechRecognizer(getApplicationContext());
+                recognizer.setRecognitionListener(new RecognitionListener() {
                 @Override public void onReadyForSpeech(Bundle params) {}
                 @Override public void onBeginningOfSpeech() {}
                 @Override public void onRmsChanged(float rmsdB) {}
@@ -185,42 +187,8 @@ public class WakeWordForegroundService extends Service {
                 @Override public void onEndOfSpeech() {}
                 @Override public void onPartialResults(Bundle partialResults) {}
                 @Override public void onEvent(int eventType, Bundle params) {}
-
-                @Override public void onError(int error) {
-                    destroyRecognizer();
-                    restartRecognition(error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ? 1800 : 900);
-                }
-
-                @Override public void onResults(Bundle results) {
-                    ArrayList<String> matches = results == null ? null
-                            : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                    String spoken = matches == null || matches.isEmpty() ? "" : matches.get(0).trim();
-
-                    if (commandMode) {
-                        awaitingCommand = false;
-                        if (!spoken.isEmpty()) savePendingCommand(spoken);
-                        destroyRecognizer();
-                        restartRecognition(900);
-                        return;
-                    }
-
-                    if (containsWakeWord(spoken)) {
-                        onWakeWordHeard();
-                        String command = extractCommandAfterWakeWord(spoken);
-                        if (!command.isEmpty()) {
-                            savePendingCommand(command);
-                        } else {
-                            awaitingCommand = true;
-                            destroyRecognizer();
-                            speakWakePrompt();
-                            return;
-                        }
-                    }
-
-                    destroyRecognizer();
-                    restartRecognition(900);
-                }
-            });
+                });
+            }
 
             Intent speech = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             speech.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
