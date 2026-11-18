@@ -492,7 +492,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
       setIsListeningOnce(true);
       try {
         await stopListeningNative();
-        await new Promise((resolve) => window.setTimeout(resolve, 180));
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
         const res = await listenOncePersianNative();
         if (res.permissionRequired) {
           onStatusToast('لطفاً مجوز میکروفون را برای استفاده از دستیار صوتی تایید کنید.');
@@ -508,7 +508,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
       } finally {
         manualListenRef.current = false;
         setIsListeningOnce(false);
-        if (wakeLoopEnabled) void startNativeWakeWordService(assistantName);
+        if (wakeLoopEnabled) window.setTimeout(() => void startNativeWakeWordService(assistantName), 1200);
       }
       return;
     }
