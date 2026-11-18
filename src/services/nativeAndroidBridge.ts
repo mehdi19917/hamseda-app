@@ -112,6 +112,7 @@ interface RoozhayeNativePlugin {
   stopListening(): Promise<{ok: boolean}>;
   startWakeWordService(options: {assistantName: string}): Promise<{ok: boolean; permissionRequired?: boolean; message?: string}>;
   stopWakeWordService(): Promise<{ok: boolean}>;
+  consumePendingWakeCommand(): Promise<{command: string}>;
   executeDeviceAction(options: {
     action: string;
     phone?: string;
@@ -553,6 +554,16 @@ export async function startNativeWakeWordService(assistantName: string): Promise
     return await RoozhayeNative.startWakeWordService({assistantName});
   } catch (err) {
     return {ok: false, message: err instanceof Error ? err.message : 'شروع شنود پس‌زمینه ممکن نشد'};
+  }
+}
+
+export async function consumePendingWakeCommandNative(): Promise<string> {
+  if (!isNativeAndroid()) return '';
+  try {
+    const result = await RoozhayeNative.consumePendingWakeCommand();
+    return result.command?.trim() || '';
+  } catch {
+    return '';
   }
 }
 
