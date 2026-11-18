@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import {toPersianDigits} from '../data/persianLibrary';
 import {
-  parseOfflineAssistantCommand,
   processAssistantUtterance,
   type PendingAssistantIntent,
 } from '../services/assistantEngine';
@@ -220,6 +219,8 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   const webRecRef = useRef<WebSpeechRecognitionInstance | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const processingRef = useRef(false);
+  // Prevent the wake-loop cleanup from cancelling a manually started recording.
+  const manualListenRef = useRef(false);
 
   // Sync draft when settings.assistantName updates
   useEffect(() => {
@@ -448,19 +449,9 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
           const transcript = res.transcript.trim();
           const wakeCheck = extractCommandAfterWakeWord(transcript, assistantName);
           // If awaiting SMS body/recipient, user doesn't need to repeat wake word
-          const offlineQuick = parseOfflineAssistantCommand(transcript, {
-            settings,
-            deviceOwner,
-            isOnline,
-            syncedContacts,
-            callers,
-            morningMessage,
-            pendingIntent,
-          });
-          const shouldRespond =
-            wakeCheck.matched ||
-            Boolean(pendingIntent) ||
-            (offlineQuick !== null && offlineQuick.action !== 'answer');
+          // In hands-free mode, never execute ambient speech as a command.
+          // Require the configured wake word, except when continuing a pending SMS flow.
+          const shouldRespond = wakeCheck.matched || Boolean(pendingIntent);
 
           if (shouldRespond) {
             setIsWakeListening(false);
@@ -483,7 +474,9 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
       cancelled = true;
       window.clearTimeout(timer);
       setIsWakeListening(false);
-      stopListeningNative();
+      if (!manualListenRef.current) {
+        stopListeningNative();
+      }
     };
   }, [
     wakeLoopEnabled,
@@ -506,6 +499,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
 
   const handleListenOnce = async () => {
     if (isListeningOnce) {
+      manualListenRef.current = false;
       await stopListeningNative();
       webRecRef.current?.stop();
       setIsListeningOnce(false);
@@ -517,16 +511,15 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     }
 
     if (isNativeAndroid()) {
-      await stopListeningNative();
+      // Set the ref before React runs the wake-loop effect cleanup.
+      // listenOncePersianNative replaces the previous native recognizer itself.
+      manualListenRef.current = true;
       setIsListeningOnce(true);
       try {
         const res = await listenOncePersianNative();
-        setIsListeningOnce(false);
         if (res.permissionRequired) {
           onStatusToast('لطفاً مجوز میکروفون را برای استفاده از دستیار صوتی تایید کنید.');
-          return;
-        }
-        if (res.ok && res.transcript?.trim()) {
+        } else if (res.ok && res.transcript?.trim()) {
           await executeUtterance(res.transcript.trim(), true);
         } else if (res.error && res.errorCode !== 6 && res.errorCode !== 7) {
           onStatusToast(res.error);
@@ -534,6 +527,9 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
           onStatusToast('صدایی واضح دریافت نشد؛ دوباره دکمه صحبت را بزنید یا دستور را تایپ کنید.');
         }
       } catch {
+        onStatusToast('ارتباط با میکروفون برقرار نشد؛ دوباره تلاش کن.');
+      } finally {
+        manualListenRef.current = false;
         setIsListeningOnce(false);
       }
       return;
