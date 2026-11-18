@@ -360,7 +360,7 @@ export async function generateAndCacheGeminiWav(params: {
   clipId?: string;
   forceRefresh?: boolean;
 }): Promise<{id: string; buffer: ArrayBuffer; isStudioWav: boolean} | {fallbackOffline: true; reason: string}> {
-  const voiceName = params.voiceName ?? 'Kore';
+  const voiceName = 'Kore'; // Negin is the app-wide default voice
   const id = params.clipId ?? hashTextKey(params.text, voiceName);
   const persona = getPersonaInfo(voiceName);
   const style = [persona.tone, params.style ?? 'Fluent natural Tehran Persian voice.'].filter(Boolean).join(' ');
@@ -456,7 +456,7 @@ export async function speakFluentPersian(
   stopAllSpeech();
   unlockAudioPlayback();
   const token = playbackToken;
-  const voiceName = options.voiceName ?? 'Kore';
+  const voiceName = 'Kore'; // Keep every assistant response on Negin, regardless of feature-specific presets
   const persona = getPersonaInfo(voiceName);
   const rate = options.rate ?? 1;
   const clipId = options.clipId ?? hashTextKey(options.text, voiceName);
