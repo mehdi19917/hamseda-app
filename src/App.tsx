@@ -126,7 +126,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   speechRate: 1,
   myName: 'من',
   partnerName: 'همراه',
-  assistantName: 'آوا',
+  assistantName: 'هم‌صدا',
   assistantWakeWordEnabled: false,
   backgroundKeepAlive: false,
   announceCalls: true,
@@ -167,9 +167,9 @@ export default function App() {
         ? saved.partnerName.trim()
         : 'همراه';
     const normalizedAssistantName =
-      typeof saved.assistantName === 'string' && saved.assistantName.trim()
+      typeof saved.assistantName === 'string' && saved.assistantName.trim() && !['بهمن', 'زری', 'آوا'].includes(saved.assistantName.trim())
         ? saved.assistantName.trim()
-        : 'آوا';
+        : 'هم‌صدا';
     return {
       ...DEFAULT_SETTINGS,
       ...saved,
@@ -461,7 +461,7 @@ export default function App() {
               ...cloudSettings,
               myName: cloudSettings.myName === 'مهدی' || cloudSettings.myName === 'بهمن' ? 'من' : cloudSettings.myName || 'من',
               partnerName: cloudSettings.partnerName === 'زری' ? 'همراه' : cloudSettings.partnerName || prev.partnerName || 'همراه',
-              assistantName: cloudSettings.assistantName?.trim() || prev.assistantName || 'آوا',
+              assistantName: cloudSettings.assistantName?.trim() && !['بهمن', 'زری', 'آوا'].includes(cloudSettings.assistantName.trim()) ? cloudSettings.assistantName.trim() : 'هم‌صدا',
             })),
           onError: (msg) => console.warn('Cloud sync listener notice:', msg),
         });
