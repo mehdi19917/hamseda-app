@@ -1,7 +1,7 @@
 import {Capacitor} from '@capacitor/core';
 
 const SERVER_URL_KEY = 'rmz_cloud_api_base_v1';
-const DEFAULT_NATIVE_API_BASE = 'https://roozhaye-manozari-7.ai.studio';
+const DEFAULT_NATIVE_API_BASE = 'https://hamseda-voice-suite.ai.studio';
 
 export function getCloudApiBaseUrl(): string {
   if (!Capacitor.isNativePlatform()) {
