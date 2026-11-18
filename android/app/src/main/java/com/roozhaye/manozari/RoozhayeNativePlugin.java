@@ -238,7 +238,7 @@ public class RoozhayeNativePlugin extends Plugin {
                     @Override
                     public void onError(int error) {
                         if (!settled.compareAndSet(false, true)) return;
-                        destroyActiveRecognizer();
+                        destroyRecognizerIfCurrent(recognizer);
                         JSObject ret = new JSObject();
                         ret.put("ok", false);
                         ret.put("errorCode", error);
@@ -249,7 +249,7 @@ public class RoozhayeNativePlugin extends Plugin {
                     @Override
                     public void onResults(Bundle results) {
                         if (!settled.compareAndSet(false, true)) return;
-                        destroyActiveRecognizer();
+                        destroyRecognizerIfCurrent(recognizer);
                         ArrayList<String> matches = results != null
                                 ? results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                                 : null;
@@ -270,7 +270,9 @@ public class RoozhayeNativePlugin extends Plugin {
                 intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR");
                 intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
                 intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
-                intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1400L);
+                intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L);
+                intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L);
+                intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, ctx.getPackageName());
                 recognizer.startListening(intent);
             } catch (Exception e) {
                 if (settled.compareAndSet(false, true)) {
@@ -292,18 +294,19 @@ public class RoozhayeNativePlugin extends Plugin {
         call.resolve(ret);
     }
 
+    private void destroyRecognizerIfCurrent(SpeechRecognizer recognizer) {
+        if (recognizer == null) return;
+        if (activeRecognizer == recognizer) activeRecognizer = null;
+        try { recognizer.cancel(); } catch (Exception ignored) {}
+        try { recognizer.destroy(); } catch (Exception ignored) {}
+    }
+
     private void destroyActiveRecognizer() {
-        if (activeRecognizer != null) {
-            try {
-                activeRecognizer.cancel();
-            } catch (Exception ignored) {
-            }
-            try {
-                activeRecognizer.destroy();
-            } catch (Exception ignored) {
-            }
-            activeRecognizer = null;
-        }
+        SpeechRecognizer recognizer = activeRecognizer;
+        activeRecognizer = null;
+        if (recognizer == null) return;
+        try { recognizer.cancel(); } catch (Exception ignored) {}
+        try { recognizer.destroy(); } catch (Exception ignored) {}
     }
 
     private String mapSpeechError(int error) {
