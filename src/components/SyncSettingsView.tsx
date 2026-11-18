@@ -1213,7 +1213,7 @@ export const SyncSettingsView: React.FC<SyncSettingsViewProps> = ({
               <input
                 type="text"
                 value={settings.partnerName}
-                onChange={(e) => onUpdateSettings({partnerName: e.target.value || 'زری'})}
+                onChange={(e) => onUpdateSettings({partnerName: e.target.value || 'همراه'})}
                 className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-200 dark:border-emerald-900 bg-slate-50/70 dark:bg-[#0B1312] text-sm text-slate-900 dark:text-white"
               />
             </div>
