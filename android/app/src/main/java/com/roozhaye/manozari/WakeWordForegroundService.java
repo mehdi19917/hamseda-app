@@ -79,6 +79,8 @@ public class WakeWordForegroundService extends Service {
         if (intent != null) {
             String requestedName = intent.getStringExtra("assistant_name");
             if (requestedName != null && !requestedName.trim().isEmpty()) assistantName = requestedName.trim();
+        } else {
+            assistantName = getSharedPreferences(PREFS, MODE_PRIVATE).getString("assistant_name", "هم‌صدا");
         }
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putBoolean("wake_word_enabled", true)
@@ -98,6 +100,9 @@ public class WakeWordForegroundService extends Service {
             startForeground(NOTIFICATION_ID, notification);
         }
         stopping = false;
+        handler.removeCallbacksAndMessages(null);
+        recognitionPending = false;
+        destroyRecognizer();
         restartRecognition(250);
         return START_STICKY;
     }
@@ -196,8 +201,7 @@ public class WakeWordForegroundService extends Service {
         String expected = normalize(assistantName);
         if (heard.isEmpty() || expected.isEmpty()) return false;
         if (heard.contains(expected)) return true;
-        return ("همصدا".equals(expected) || "هَمْصَدا".equals(expected))
-                && (heard.contains("همصدا") || heard.contains("همصدا"));
+        return false;
     }
 
     private String normalize(String value) {
