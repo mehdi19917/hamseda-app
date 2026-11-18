@@ -1115,6 +1115,16 @@ public class RoozhayeNativePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void consumePendingWakeCommand(PluginCall call) {
+        SharedPreferences prefs = getContext().getSharedPreferences("rmz_native_prefs", Context.MODE_PRIVATE);
+        String command = prefs.getString("pending_wake_command", "");
+        prefs.edit().remove("pending_wake_command").remove("pending_wake_command_at").apply();
+        JSObject ret = new JSObject();
+        ret.put("command", command == null ? "" : command);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
     public void setServerBaseUrl(PluginCall call) {
         String url = call.getString("url", "");
         SharedPreferences prefs = getContext().getSharedPreferences("rmz_native_prefs", Context.MODE_PRIVATE);
