@@ -1664,6 +1664,67 @@ app.post('/api/night-discover', async (req, res) => {
   }
 });
 
+
+app.post('/api/assistant-chat', async (req, res) => {
+  const ai = getAiClient();
+  if (!ai) {
+    res.status(503).json({error: 'موتور گفت‌وگوی آنلاین در دسترس نیست.'});
+    return;
+  }
+
+  const assistantName = typeof req.body?.assistantName === 'string' ? req.body.assistantName.slice(0, 40) : 'هم‌صدا';
+  const selfName = typeof req.body?.selfName === 'string' ? req.body.selfName.slice(0, 60) : 'دوست من';
+  const partnerName = typeof req.body?.partnerName === 'string' ? req.body.partnerName.slice(0, 60) : '';
+  const userMessage = typeof req.body?.userMessage === 'string' ? req.body.userMessage.trim().slice(0, 4000) : '';
+  const rawHistory = Array.isArray(req.body?.history) ? req.body.history : [];
+  const history = rawHistory
+    .filter((item: {role?: string; text?: string}) =>
+      (item?.role === 'user' || item?.role === 'assistant') &&
+      typeof item?.text === 'string' && item.text.trim()
+    )
+    .slice(-12)
+    .map((item: {role: 'user' | 'assistant'; text: string}) => ({
+      role: item.role === 'assistant' ? 'model' : 'user',
+      parts: [{text: item.text.slice(0, 2000)}],
+    }));
+
+  if (!userMessage) {
+    res.status(400).json({error: 'پیام خالی است.'});
+    return;
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-4-hydrogen',
+      contents: [
+        ...history,
+        {role: 'user', parts: [{text: userMessage}]},
+      ],
+      config: {
+        systemInstruction: `تو مغز گفت‌وگوی «${assistantName}» هستی؛ یک همراه فارسی‌زبان صمیمی، باهوش، دقیق و طبیعی برای ${selfName}${partnerName ? ` و خانواده‌اش، از جمله ${partnerName}` : ''}.
+قواعد:
+- فارسی محاوره‌ای روان و طبیعی بنویس؛ نه لحن اداری، نه جمله‌های رباتی و کلیشه‌ای.
+- سابقه همین مکالمه را واقعاً دنبال کن؛ اگر کاربر به «این»، «اون»، «همون» یا حرف قبلی اشاره کرد، از تاریخچه برای فهم منظور استفاده کن.
+- پاسخ را متناسب با سؤال بده؛ برای سؤال ساده کوتاه و برای موضوع پیچیده با توضیح کافی.
+- اگر چیزی را نمی‌دانی، صادقانه بگو و اطلاعات یا خاطره‌ای جعل نکن.
+- تو فقط موتور گفت‌وگویی هستی و به‌تنهایی هیچ تماس، پیام، خرید یا تغییر تنظیمات گوشی را اجرا نمی‌کنی. هر درخواست اجرایی باید به مسیریاب فرمان برنامه سپرده شود؛ هرگز ادعا نکن کاری انجام شده است.
+- پاسخ را بدون عنوان و قالب JSON، فقط به صورت متن فارسی برگردان.`,
+        thinkingConfig: {thinkingLevel: ThinkingLevel.LOW},
+      },
+    });
+
+    const replyText = (response.text || '').trim();
+    if (!replyText) {
+      res.status(502).json({error: 'پاسخ خالی از موتور گفت‌وگو دریافت شد.'});
+      return;
+    }
+    res.json({replyText});
+  } catch (err) {
+    console.error('Assistant conversation engine failed:', err);
+    res.status(500).json({error: 'موتور گفت‌وگو نتوانست پاسخ بسازد.'});
+  }
+});
+
 app.post('/api/assistant-command', async (req, res) => {
   const utterance = typeof req.body?.utterance === 'string' ? req.body.utterance.trim() : '';
   if (!utterance) {
