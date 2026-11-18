@@ -761,7 +761,7 @@ export const CallerAnnouncerView: React.FC<CallerAnnouncerViewProps> = ({
                 type="text"
                 value={smsSender}
                 onChange={(e) => setSmsSender(e.target.value)}
-                placeholder="مثلاً: زری جان یا Ali Tech"
+                placeholder="مثلاً: نام مخاطب یا Ali Tech"
                 className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-200 dark:border-emerald-900 bg-slate-50/70 dark:bg-[#0B1312] text-sm text-slate-900 dark:text-white"
               />
             </div>
@@ -964,7 +964,7 @@ export const CallerAnnouncerView: React.FC<CallerAnnouncerViewProps> = ({
                   type="text"
                   value={testName}
                   onChange={(e) => setTestName(e.target.value)}
-                  placeholder="مثلاً: زری جان یا Sara Design"
+                  placeholder="مثلاً: نام مخاطب یا Sara Design"
                   className="w-full min-h-[44px] px-4 rounded-xl border border-slate-200 dark:border-emerald-900 bg-slate-50/70 dark:bg-[#0B1312] text-sm text-slate-900 dark:text-white"
                 />
               </div>
@@ -1085,7 +1085,7 @@ export const CallerAnnouncerView: React.FC<CallerAnnouncerViewProps> = ({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="مثلاً: زری جان یا David Manager"
+                placeholder="مثلاً: نام مخاطب یا David Manager"
                 className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-200 dark:border-emerald-900 bg-slate-50/70 dark:bg-[#0B1312] text-sm text-slate-900 dark:text-white"
               />
             </div>
@@ -1214,8 +1214,8 @@ export const CallerAnnouncerView: React.FC<CallerAnnouncerViewProps> = ({
                   type="button"
                   onClick={() =>
                     testNativeCallAnnouncement(
-                      'زری جان',
-                      'تماس ورودی از طرف زری جان',
+                      'مخاطب عزیز',
+                      'تماس ورودی از طرف مخاطب',
                       getVoiceGender(defaultVoice),
                       defaultVoice
                     )
