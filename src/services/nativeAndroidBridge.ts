@@ -110,6 +110,8 @@ interface RoozhayeNativePlugin {
     error?: string;
   }>;
   stopListening(): Promise<{ok: boolean}>;
+  startWakeWordService(options: {assistantName: string}): Promise<{ok: boolean; permissionRequired?: boolean; message?: string}>;
+  stopWakeWordService(): Promise<{ok: boolean}>;
   executeDeviceAction(options: {
     action: string;
     phone?: string;
@@ -542,6 +544,24 @@ export async function listenOncePersianNative(): Promise<{
     return await RoozhayeNative.listenOncePersian();
   } catch (err) {
     return {ok: false, error: err instanceof Error ? err.message : 'خطای میکروفون'};
+  }
+}
+
+export async function startNativeWakeWordService(assistantName: string): Promise<{ok: boolean; permissionRequired?: boolean; message?: string}> {
+  if (!isNativeAndroid()) return {ok: false};
+  try {
+    return await RoozhayeNative.startWakeWordService({assistantName});
+  } catch (err) {
+    return {ok: false, message: err instanceof Error ? err.message : 'شروع شنود پس‌زمینه ممکن نشد'};
+  }
+}
+
+export async function stopNativeWakeWordService(): Promise<void> {
+  if (!isNativeAndroid()) return;
+  try {
+    await RoozhayeNative.stopWakeWordService();
+  } catch {
+    // Native service may already be stopped.
   }
 }
 
