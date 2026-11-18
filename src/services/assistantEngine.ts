@@ -151,8 +151,14 @@ export function findBestContactMatch(
 
 function getCurrentPersianTimeAndDate(): {timeStr: string; dateStr: string} {
   const now = new Date();
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mm = String(now.getMinutes()).padStart(2, '0');
+  const clockParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tehran',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const hh = clockParts.find((part) => part.type === 'hour')?.value ?? '00';
+  const mm = clockParts.find((part) => part.type === 'minute')?.value ?? '00';
   const timeStr = `${toPersianDigits(hh)} و ${toPersianDigits(mm)} دقیقه`;
   const dateStr = formatJalaliFull(now);
   return {timeStr, dateStr};
