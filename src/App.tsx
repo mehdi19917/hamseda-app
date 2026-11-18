@@ -174,6 +174,7 @@ export default function App() {
       ...DEFAULT_SETTINGS,
       ...saved,
       myName: normalizedMyName,
+      partnerName: normalizedPartnerName,
       assistantName: normalizedAssistantName,
     };
   });
@@ -459,6 +460,7 @@ export default function App() {
               ...prev,
               ...cloudSettings,
               myName: cloudSettings.myName === 'مهدی' || cloudSettings.myName === 'بهمن' ? 'من' : cloudSettings.myName || 'من',
+              partnerName: cloudSettings.partnerName === 'زری' ? 'همراه' : cloudSettings.partnerName || prev.partnerName || 'همراه',
               assistantName: cloudSettings.assistantName?.trim() || prev.assistantName || 'آوا',
             })),
           onError: (msg) => console.warn('Cloud sync listener notice:', msg),
