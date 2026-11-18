@@ -17,9 +17,10 @@ import {
 import {apiUrl, safeReadJsonResponse} from './apiConfig';
 
 export interface PendingAssistantIntent {
-  type: 'awaiting_sms_body' | 'awaiting_sms_recipient';
+  type: 'awaiting_sms_body' | 'awaiting_sms_recipient' | 'awaiting_sms_confirmation';
   targetName?: string;
   targetPhone?: string;
+  smsBody?: string;
 }
 
 export interface AssistantEngineContext {
@@ -193,6 +194,13 @@ export function parseOfflineAssistantCommand(
   const commandRaw = wake.matched ? wake.command : rawTranscript.trim();
   const norm = normalizeAssistantText(commandRaw);
   if (!norm) return null;
+
+  // Never send until the exact recipient and body are explicitly confirmed.
+  if (ctx.pendingIntent?.type === 'awaiting_sms_confirmation') {
+    if (/^(لغو|کنسل|بی ?خیال|بیخیال|نفرست|ولش کن|پشیمون شدم|انصراف|نه|خیر)/.test(norm)) return {action: 'answer', replyText: 'باشه، پیام ارسال نشد و لغو شد.'};
+    if (/^(تایید|تأیید|بله|آره|اره|درسته|درست است|ارسال کن|بفرست|اوکی|باشه)/.test(norm)) return {action: 'send_sms', targetName: ctx.pendingIntent.targetName, targetPhone: ctx.pendingIntent.targetPhone, smsBody: ctx.pendingIntent.smsBody, replyText: 'در حال ارسال پیام تأییدشده به ' + ctx.pendingIntent.targetName + ' هستم.'};
+    return {action: 'answer', replyText: 'برای جلوگیری از ارسال اشتباهی، فقط «تأیید» برای ارسال یا «لغو» برای انصراف بگو.'};
+  }
 
   // Handle pending SMS conversation turn first
   if (ctx.pendingIntent?.type === 'awaiting_sms_body') {
@@ -486,6 +494,9 @@ export function parseOfflineAssistantCommand(
       replyText: 'صدای گوشی کمتر شد.',
     };
   }
+
+  // Telegram requests must never be treated as SMS.
+  if (/تلگرام/.test(norm) && /(پیام|مسیج|بنویس|بفرست|ارسال)/.test(norm)) return {action: 'open_app', targetName: 'تلگرام', query: 'تلگرام', replyText: 'تلگرام را باز می‌کنم؛ اما ارسال پیام تلگرام را خودکار انجام نمی‌دهم. مخاطب و متن را داخل خود تلگرام بررسی و ارسال کن.'};
 
   // 7. Send SMS
   if (/(پیامک|اس ام اس|اس‌ام‌اس|پیام بده|پیام بفرست|مسیج)/.test(norm)) {
