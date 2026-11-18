@@ -1,22 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <radialGradient id="emBg" cx="50%" cy="44%" r="65%">
-      <stop offset="0%" stop-color="#0C5D49"/>
-      <stop offset="65%" stop-color="#07382B"/>
-      <stop offset="100%" stop-color="#04241C"/>
-    </radialGradient>
-    <linearGradient id="goldArc" x1="120" y1="120" x2="392" y2="392" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFF3C4"/>
-      <stop offset="50%" stop-color="#F6D37A"/>
-      <stop offset="100%" stop-color="#D49A3A"/>
+    <linearGradient id="bg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#12A879"/>
+      <stop offset="1" stop-color="#064E3B"/>
     </linearGradient>
-    <radialGradient id="sunCore" cx="50%" cy="60%" r="55%">
-      <stop offset="0%" stop-color="#FDE047"/>
-      <stop offset="100%" stop-color="#EA8C15"/>
-    </radialGradient>
+    <linearGradient id="wave" x1="112" y1="132" x2="400" y2="382" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#C7F9E8"/>
+    </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#emBg)"/>
-  <path d="M256 172C220 128 144 134 128 202C114 264 176 328 256 382C336 328 398 264 384 202C368 134 292 128 256 172Z" stroke="url(#goldArc)" stroke-width="26" stroke-linejoin="round" fill="none"/>
-  <path d="M168 232C184 188 228 178 256 206C284 178 328 188 344 232" stroke="url(#goldArc)" stroke-width="16" stroke-linecap="round" fill="none"/>
-  <path d="M204 290A54 54 0 0 1 308 290C284 316 228 316 204 290Z" fill="url(#sunCore)"/>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <path d="M256 78c-91 0-165 68-165 153 0 47 24 88 63 116l-16 75 91-40c9 1 18 2 27 2 91 0 165-68 165-153S347 78 256 78Z" fill="#FFFFFF" fill-opacity=".12" stroke="#FFFFFF" stroke-opacity=".3" stroke-width="8"/>
+  <rect x="222" y="150" width="68" height="145" rx="34" fill="url(#wave)"/>
+  <path d="M184 257v17c0 41 32 74 72 74s72-33 72-74v-17M256 348v42M218 390h76" stroke="url(#wave)" stroke-width="19" stroke-linecap="round"/>
+  <path d="M157 224c-14 21-22 46-22 73M355 224c14 21 22 46 22 73" stroke="#A7F3D0" stroke-width="15" stroke-linecap="round"/>
+  <path d="M112 198c-24 31-38 69-38 109M400 198c24 31 38 69 38 109" stroke="#6EE7B7" stroke-width="12" stroke-linecap="round" opacity=".9"/>
 </svg>
