@@ -226,11 +226,17 @@ public class BilingualSpeechHelper {
             if (matching.isEmpty()) return null;
             String[] hints = isMale
                     ? new String[]{"male", "man", "ard", "m1", "m2", "network"}
-                    : new String[]{"female", "woman", "f1", "f2", "local"};
+                    : new String[]{"female", "woman", "f1", "f2", "zira", "sara", "daria", "samantha", "karen", "victoria"};
             for (Voice v : matching) {
                 String n = v.getName().toLowerCase();
                 for (String h : hints) {
                     if (n.contains(h)) return v;
+                }
+            }
+            if (!isMale) {
+                for (Voice v : matching) {
+                    String n = v.getName().toLowerCase();
+                    if (!n.contains("male") && !n.contains("man") && !n.contains("m1") && !n.contains("m2")) return v;
                 }
             }
             return matching.get(isMale ? matching.size() - 1 : 0);
