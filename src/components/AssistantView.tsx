@@ -32,6 +32,7 @@ import {
   type PendingAssistantIntent,
 } from '../services/assistantEngine';
 import {
+  consumePendingWakeCommandNative,
   executeDeviceActionNative,
   isNativeAndroid,
   listenOncePersianNative,
@@ -444,6 +445,31 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     return () => { mounted = false; };
   }, [wakeLoopEnabled, assistantName, onUpdateSettings, onStatusToast]);
 
+  // Commands captured by the Android foreground listener are handed to the same
+  // assistant pipeline. If Android paused the WebView in the background, the
+  // pending command remains stored until the app resumes.
+  useEffect(() => {
+    if (!isNativeAndroid() || !wakeLoopEnabled) return;
+    let disposed = false;
+    let polling = false;
+    const pollPendingCommand = async () => {
+      if (disposed || polling || isBusy || isListeningOnce || isRecordingAudio) return;
+      polling = true;
+      try {
+        const command = await consumePendingWakeCommandNative();
+        if (!disposed && command) await executeUtterance(command, true);
+      } finally {
+        polling = false;
+      }
+    };
+    void pollPendingCommand();
+    const timer = window.setInterval(() => void pollPendingCommand(), 900);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [wakeLoopEnabled, executeUtterance, isBusy, isListeningOnce, isRecordingAudio]);
+
   const handleListenOnce = async () => {
     if (isListeningOnce) {
       manualListenRef.current = false;
@@ -458,6 +484,8 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     }
 
     if (isNativeAndroid()) {
+      // Pause the background recognizer while the one-shot microphone session owns audio.
+      if (wakeLoopEnabled) await stopNativeWakeWordService();
       // Set the ref before React runs the wake-loop effect cleanup.
       // listenOncePersianNative replaces the previous native recognizer itself.
       manualListenRef.current = true;
@@ -480,6 +508,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
       } finally {
         manualListenRef.current = false;
         setIsListeningOnce(false);
+        if (wakeLoopEnabled) void startNativeWakeWordService(assistantName);
       }
       return;
     }
