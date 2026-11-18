@@ -461,21 +461,21 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
         }
 
         // Small cooldown between SpeechRecognizer restarts
-        await new Promise((r) => setTimeout(r, 450));
+        await new Promise((r) => setTimeout(r, 1200));
       }
       if (!cancelled) setIsWakeListening(false);
     };
 
     const timer = window.setTimeout(() => {
-      runLoop();
-    }, 450);
+      void runLoop();
+    }, 900);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
       setIsWakeListening(false);
       if (!manualListenRef.current) {
-        stopListeningNative();
+        void stopListeningNative();
       }
     };
   }, [
@@ -516,6 +516,8 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
       manualListenRef.current = true;
       setIsListeningOnce(true);
       try {
+        await stopListeningNative();
+        await new Promise((resolve) => window.setTimeout(resolve, 180));
         const res = await listenOncePersianNative();
         if (res.permissionRequired) {
           onStatusToast('لطفاً مجوز میکروفون را برای استفاده از دستیار صوتی تایید کنید.');
