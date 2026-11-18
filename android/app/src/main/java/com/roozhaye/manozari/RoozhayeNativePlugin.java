@@ -1088,6 +1088,33 @@ public class RoozhayeNativePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void startWakeWordService(PluginCall call) {
+        Context ctx = getContext();
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            JSObject ret = new JSObject();
+            ret.put("ok", false);
+            ret.put("permissionRequired", true);
+            ret.put("message", "برای گوش‌به‌زنگ بودن، اجازه میکروفون لازم است.");
+            call.resolve(ret);
+            return;
+        }
+        String assistantName = call.getString("assistantName", "هم‌صدا");
+        boolean started = WakeWordForegroundService.start(ctx, assistantName);
+        JSObject ret = new JSObject();
+        ret.put("ok", started);
+        if (!started) ret.put("message", "شروع سرویس شنود ممکن نشد؛ برنامه را باز نگه دارید و دوباره تلاش کنید.");
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void stopWakeWordService(PluginCall call) {
+        WakeWordForegroundService.stop(getContext());
+        JSObject ret = new JSObject();
+        ret.put("ok", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
     public void setServerBaseUrl(PluginCall call) {
         String url = call.getString("url", "");
         SharedPreferences prefs = getContext().getSharedPreferences("rmz_native_prefs", Context.MODE_PRIVATE);
