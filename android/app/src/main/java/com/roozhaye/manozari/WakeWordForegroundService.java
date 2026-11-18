@@ -121,6 +121,10 @@ public class WakeWordForegroundService extends Service {
     }
 
     private Notification buildNotification(String message) {
+        return buildNotification(message, 0, false);
+    }
+
+    private Notification buildNotification(String message, int progress, boolean indeterminate) {
         Intent open = new Intent(this, MainActivity.class);
         open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pending = PendingIntent.getActivity(this, 712, open,
@@ -134,12 +138,38 @@ public class WakeWordForegroundService extends Service {
                 .setOnlyAlertOnce(true)
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setProgress(100, Math.max(0, Math.min(100, progress)), indeterminate)
                 .build();
     }
 
     private void updateNotification(String message) {
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null) manager.notify(NOTIFICATION_ID, buildNotification(message));
+    }
+
+    private void updateDownloadProgress(long downloaded, long total) {
+        long safeDownloaded = Math.max(0L, downloaded);
+        if (total > 0L) {
+            int percent = (int) Math.min(100L, (safeDownloaded * 100L) / total);
+            String message = "دانلود مدل فارسی: " + toPersianDigits(percent) + "٪  ·  "
+                    + formatMegabytes(safeDownloaded) + " از " + formatMegabytes(total) + " مگابایت";
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) manager.notify(NOTIFICATION_ID, buildNotification(message, percent, false));
+        } else {
+            String message = "در حال دانلود مدل فارسی · دریافت‌شده: " + formatMegabytes(safeDownloaded) + " مگابایت";
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) manager.notify(NOTIFICATION_ID, buildNotification(message, 0, true));
+        }
+    }
+
+    private String formatMegabytes(long bytes) {
+        return String.format(Locale.US, "%.1f", bytes / (1024.0 * 1024.0));
+    }
+
+    private String toPersianDigits(int value) {
+        return String.valueOf(value).replace('0', '۰').replace('1', '۱').replace('2', '۲')
+                .replace('3', '۳').replace('4', '۴').replace('5', '۵')
+                .replace('6', '۶').replace('7', '۷').replace('8', '۸').replace('9', '۹');
     }
 
     private void createChannel() {
@@ -198,14 +228,21 @@ public class WakeWordForegroundService extends Service {
                  FileOutputStream out = new FileOutputStream(zipFile)) {
                 byte[] buffer = new byte[32768];
                 long total = 0;
+                long lastProgressUpdate = 0L;
                 int count;
                 while ((count = in.read(buffer)) != -1) {
                     if (stopping || Thread.currentThread().isInterrupted()) throw new InterruptedException("stopped");
                     total += count;
                     if (total > MAX_MODEL_BYTES) throw new IllegalStateException("Model archive too large");
                     out.write(buffer, 0, count);
+                    long now = System.currentTimeMillis();
+                    if (now - lastProgressUpdate >= 300L) {
+                        updateDownloadProgress(total, declared);
+                        lastProgressUpdate = now;
+                    }
                 }
                 out.getFD().sync();
+                updateDownloadProgress(total, declared);
             }
         } finally {
             if (connection != null) connection.disconnect();
