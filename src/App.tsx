@@ -159,7 +159,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = readJsonStorage<Partial<AppSettings>>(STORAGE_KEYS.settings, {});
     const normalizedMyName =
-      typeof saved.myName === 'string' && saved.myName.trim() && saved.myName.trim() !== 'مهدی'
+      typeof saved.myName === 'string' && saved.myName.trim() && saved.myName.trim() !== 'مهدی' && saved.myName.trim() !== 'بهمن'
         ? saved.myName.trim()
         : 'من';
     const normalizedPartnerName =
