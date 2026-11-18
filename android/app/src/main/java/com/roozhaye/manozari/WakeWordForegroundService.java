@@ -12,38 +12,51 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.speech.RecognitionListener;
-import android.speech.RecognizerIntent;
-import android.speech.SpeechRecognizer;
-import android.speech.tts.TextToSpeech;
-import android.speech.tts.UtteranceProgressListener;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
+import org.json.JSONObject;
+import org.vosk.Model;
+import org.vosk.Recognizer;
+import org.vosk.android.RecognitionListener;
+import org.vosk.android.SpeechService;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class WakeWordForegroundService extends Service {
     private static final String CHANNEL_ID = "hamseda_wake_word";
     private static final int NOTIFICATION_ID = 7012;
     private static final String PREFS = "rmz_native_prefs";
     private static final String ACTION_START = "com.roozhaye.manozari.WAKE_START";
-    private static final String ACTION_STOP = "com.roozhaye.manozari.WAKE_STOP";
+    private static final String MODEL_NAME = "vosk-model-small-fa-0.42";
+    private static final String MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip";
+    private static final long MAX_MODEL_BYTES = 150L * 1024L * 1024L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private SpeechRecognizer recognizer;
-    private TextToSpeech textToSpeech;
-    private boolean ttsReady = false;
-    private boolean stopping = false;
-    private boolean recognitionPending = false;
-    private boolean awaitingCommand = false;
+    private final ExecutorService modelExecutor = Executors.newSingleThreadExecutor();
+    private volatile boolean stopping = false;
+    private volatile boolean awaitingCommand = false;
+    private volatile boolean modelLoading = false;
+    private Model model;
+    private Recognizer recognizer;
+    private SpeechService speechService;
     private String assistantName = "هم‌صدا";
     private long lastWakeAt = 0L;
 
@@ -73,21 +86,10 @@ public class WakeWordForegroundService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         createChannel();
-        textToSpeech = new TextToSpeech(getApplicationContext(), status -> {
-            if (status == TextToSpeech.SUCCESS && textToSpeech != null) {
-                int languageResult = textToSpeech.setLanguage(new Locale("fa", "IR"));
-                ttsReady = languageResult != TextToSpeech.LANG_MISSING_DATA
-                        && languageResult != TextToSpeech.LANG_NOT_SUPPORTED;
-            }
-        });
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_STOP.equals(intent.getAction())) {
-            stopSelf();
-            return START_NOT_STICKY;
-        }
-        if (intent != null) {
+        if (intent != null && intent.hasExtra("assistant_name")) {
             String requestedName = intent.getStringExtra("assistant_name");
             if (requestedName != null && !requestedName.trim().isEmpty()) assistantName = requestedName.trim();
         } else {
@@ -107,32 +109,25 @@ public class WakeWordForegroundService extends Service {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, buildNotification(false),
+            startForeground(NOTIFICATION_ID, buildNotification("در حال آماده‌سازی موتور شنود فارسی…"),
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
         } else {
-            startForeground(NOTIFICATION_ID, buildNotification(false));
+            startForeground(NOTIFICATION_ID, buildNotification("در حال آماده‌سازی موتور شنود فارسی…"));
         }
 
         stopping = false;
-        handler.removeCallbacksAndMessages(null);
-        recognitionPending = false;
-        destroyRecognizer();
-        restartRecognition(300);
+        if (speechService == null && !modelLoading) prepareModelAndStart();
         return START_STICKY;
     }
 
-    private Notification buildNotification(boolean commandReady) {
+    private Notification buildNotification(String message) {
         Intent open = new Intent(this, MainActivity.class);
         open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pending = PendingIntent.getActivity(this, 712, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        String title = commandReady ? "هم‌صدا · فرمان دریافت شد" : "هم‌صدا · گوش‌به‌زنگ";
-        String message = commandReady
-                ? "برای اجرای فرمان وارد دستیار شو."
-                : "صدایت را می‌شنوم؛ نام هم‌صدا را بگو.";
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_rmz)
-                .setContentTitle(title)
+                .setContentTitle("هم‌صدا · گوش‌به‌زنگ")
                 .setContentText(message)
                 .setContentIntent(pending)
                 .setOngoing(true)
@@ -140,6 +135,11 @@ public class WakeWordForegroundService extends Service {
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .build();
+    }
+
+    private void updateNotification(String message) {
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager != null) manager.notify(NOTIFICATION_ID, buildNotification(message));
     }
 
     private void createChannel() {
@@ -152,106 +152,166 @@ public class WakeWordForegroundService extends Service {
         }
     }
 
-    private void restartRecognition(long delayMs) {
-        if (stopping || recognitionPending) return;
-        recognitionPending = true;
-        handler.postDelayed(() -> {
-            recognitionPending = false;
-            beginRecognition();
-        }, delayMs);
-    }
-
-    private void beginRecognition() {
-        if (stopping) return;
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            restartRecognition(2500);
-            return;
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED) {
-            stopSelf();
-            return;
-        }
-
-        try {
-            // Keep one SpeechRecognizer instance alive for the whole wake-word session.
-            // Android recognition is still session-based, but reusing the engine avoids
-            // repeatedly tearing down and recreating the recognizer after every phrase.
-            if (recognizer == null) {
-                recognizer = SpeechRecognizer.createSpeechRecognizer(getApplicationContext());
-                recognizer.setRecognitionListener(new RecognitionListener() {
-                    @Override public void onReadyForSpeech(Bundle params) {}
-                    @Override public void onBeginningOfSpeech() {}
-                    @Override public void onRmsChanged(float rmsdB) {}
-                    @Override public void onBufferReceived(byte[] buffer) {}
-                    @Override public void onEndOfSpeech() {}
-                    @Override public void onPartialResults(Bundle partialResults) {}
-                    @Override public void onEvent(int eventType, Bundle params) {}
-
-                    @Override public void onError(int error) {
-                        // Restart only the recognition session, not the recognizer service object.
-                        restartRecognition(error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ? 1800 : 900);
+    private void prepareModelAndStart() {
+        modelLoading = true;
+        modelExecutor.execute(() -> {
+            try {
+                File modelDir = new File(getFilesDir(), "vosk-fa-0.42");
+                File modelRoot = new File(modelDir, MODEL_NAME);
+                if (!new File(modelRoot, "am").isDirectory() || !new File(modelRoot, "conf").isDirectory()) {
+                    updateNotification("دانلود موتور فارسی (حدود ۵۳ مگابایت)…");
+                    installModel(modelDir, modelRoot);
+                }
+                Model loaded = new Model(modelRoot.getAbsolutePath());
+                handler.post(() -> {
+                    modelLoading = false;
+                    if (stopping) {
+                        loaded.close();
+                        return;
                     }
-
-                    @Override public void onResults(Bundle results) {
-                        ArrayList<String> matches = results == null ? null
-                                : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                        String spoken = matches == null || matches.isEmpty() ? "" : matches.get(0).trim();
-
-                        if (awaitingCommand) {
-                            awaitingCommand = false;
-                            if (!spoken.isEmpty()) savePendingCommand(spoken);
-                            restartRecognition(900);
-                            return;
-                        }
-
-                        if (containsWakeWord(spoken)) {
-                            onWakeWordHeard();
-                            String command = extractCommandAfterWakeWord(spoken);
-                            if (!command.isEmpty()) {
-                                savePendingCommand(command);
-                            } else {
-                                awaitingCommand = true;
-                                speakWakePrompt();
-                                return;
-                            }
-                        }
-                        restartRecognition(350);
-                    }
+                    model = loaded;
+                    startContinuousRecognition();
+                });
+            } catch (Exception e) {
+                handler.post(() -> {
+                    modelLoading = false;
+                    if (!stopping) updateNotification("آماده‌سازی مدل ناموفق بود؛ اینترنت را بررسی و دوباره شنود را روشن کنید.");
                 });
             }
+        });
+    }
 
-            Intent speech = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-            speech.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            speech.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR");
-            speech.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR");
-            speech.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
-            speech.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
-            speech.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L);
-            speech.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L);
-            speech.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
-            recognizer.startListening(speech);
+    private void installModel(File modelDir, File expectedRoot) throws Exception {
+        File zipFile = new File(getCacheDir(), MODEL_NAME + ".zip.part");
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(MODEL_URL).openConnection();
+            connection.setConnectTimeout(20000);
+            connection.setReadTimeout(60000);
+            connection.setInstanceFollowRedirects(true);
+            connection.connect();
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) throw new IllegalStateException("Model download HTTP " + status);
+            long declared = connection.getContentLengthLong();
+            if (declared > MAX_MODEL_BYTES) throw new IllegalStateException("Model archive too large");
+            try (InputStream in = new BufferedInputStream(connection.getInputStream());
+                 FileOutputStream out = new FileOutputStream(zipFile)) {
+                byte[] buffer = new byte[32768];
+                long total = 0;
+                int count;
+                while ((count = in.read(buffer)) != -1) {
+                    if (stopping || Thread.currentThread().isInterrupted()) throw new InterruptedException("stopped");
+                    total += count;
+                    if (total > MAX_MODEL_BYTES) throw new IllegalStateException("Model archive too large");
+                    out.write(buffer, 0, count);
+                }
+                out.getFD().sync();
+            }
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+
+        File staging = new File(getFilesDir(), "vosk-fa-staging");
+        deleteRecursively(staging);
+        if (!staging.mkdirs() && !staging.isDirectory()) throw new IllegalStateException("Cannot create model folder");
+        String stagingCanonical = staging.getCanonicalPath() + File.separator;
+        try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(new java.io.FileInputStream(zipFile)))) {
+            ZipEntry entry;
+            byte[] buffer = new byte[32768];
+            while ((entry = zis.getNextEntry()) != null) {
+                File target = new File(staging, entry.getName());
+                String canonical = target.getCanonicalPath();
+                if (!canonical.startsWith(stagingCanonical)) throw new SecurityException("Invalid model archive path");
+                if (entry.isDirectory()) {
+                    if (!target.mkdirs() && !target.isDirectory()) throw new IllegalStateException("Cannot create model directory");
+                } else {
+                    File parent = target.getParentFile();
+                    if (parent != null && !parent.mkdirs() && !parent.isDirectory()) throw new IllegalStateException("Cannot create model folder");
+                    try (FileOutputStream out = new FileOutputStream(target)) {
+                        int n;
+                        while ((n = zis.read(buffer)) != -1) out.write(buffer, 0, n);
+                    }
+                }
+                zis.closeEntry();
+            }
+        }
+        File extracted = new File(staging, MODEL_NAME);
+        if (!new File(extracted, "am").isDirectory() || !new File(extracted, "conf").isDirectory()) {
+            throw new IllegalStateException("Persian model archive structure is invalid");
+        }
+        deleteRecursively(modelDir);
+        if (!modelDir.mkdirs() && !modelDir.isDirectory()) throw new IllegalStateException("Cannot create final model folder");
+        File finalRoot = new File(modelDir, MODEL_NAME);
+        if (!extracted.renameTo(finalRoot)) throw new IllegalStateException("Cannot install Persian model");
+        deleteRecursively(staging);
+        //noinspection ResultOfMethodCallIgnored
+        zipFile.delete();
+    }
+
+    private void startContinuousRecognition() {
+        if (stopping || model == null) return;
+        try {
+            recognizer = new Recognizer(model, 16000.0f);
+            speechService = new SpeechService(recognizer, 16000.0f);
+            boolean started = speechService.startListening(new RecognitionListener() {
+                @Override public void onResult(String hypothesis) {
+                    handleRecognizedText(readText(hypothesis));
+                }
+                @Override public void onFinalResult(String hypothesis) {
+                    handleRecognizedText(readText(hypothesis));
+                }
+                @Override public void onPartialResult(String hypothesis) {}
+                @Override public void onError(Exception e) {
+                    handler.postDelayed(() -> recoverContinuousRecognition(), 1200);
+                }
+                @Override public void onTimeout() {}
+            });
+            if (!started) throw new IllegalStateException("Vosk listener did not start");
+            updateNotification("گوش‌به‌زنگ پیوسته فارسی فعال است؛ نام هم‌صدا را بگو.");
         } catch (Exception e) {
-            destroyRecognizer();
-            restartRecognition(1800);
+            updateNotification("شروع شنود پیوسته ناموفق بود؛ دوباره تلاش می‌کنم.");
+            handler.postDelayed(() -> recoverContinuousRecognition(), 2500);
+        }
+    }
+
+    private String readText(String json) {
+        try {
+            return new JSONObject(json == null ? "{}" : json).optString("text", "").trim();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private void handleRecognizedText(String spoken) {
+        if (stopping || spoken == null || spoken.trim().isEmpty()) return;
+        if (awaitingCommand) {
+            awaitingCommand = false;
+            savePendingCommand(spoken);
+            return;
+        }
+        if (!containsWakeWord(spoken)) return;
+
+        onWakeWordHeard();
+        String command = extractCommandAfterWakeWord(spoken);
+        if (!command.isEmpty()) {
+            savePendingCommand(command);
+        } else {
+            awaitingCommand = true;
+            speakWakePrompt();
         }
     }
 
     private void speakWakePrompt() {
-        if (!ttsReady || textToSpeech == null) {
-            restartRecognition(700);
-            return;
-        }
-        textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-            @Override public void onStart(String utteranceId) {}
-            @Override public void onDone(String utteranceId) {
-                handler.post(() -> restartRecognition(900));
-            }
-            @Override public void onError(String utteranceId) {
-                handler.post(() -> restartRecognition(1200));
-            }
-        });
-        textToSpeech.speak("جانم، بفرمایید", TextToSpeech.QUEUE_FLUSH, null, "hamseda-wake-prompt");
+        SpeechService active = speechService;
+        if (active != null) active.setPause(true);
+        // Use the same native Persian female-voice selection/pitch path as the manual assistant.
+        BilingualSpeechHelper.speak(getApplicationContext(), "جانم، بفرمایید", false, 1.0f, false,
+                success -> handler.post(() -> {
+                    if (stopping) return;
+                    if (recognizer != null) recognizer.reset();
+                    SpeechService current = speechService;
+                    if (current != null) current.setPause(false);
+                }));
     }
 
     private boolean containsWakeWord(String spoken) {
@@ -283,8 +343,7 @@ public class WakeWordForegroundService extends Service {
         long now = System.currentTimeMillis();
         if (now - lastWakeAt < 2500L) return;
         lastWakeAt = now;
-        NotificationManager manager = getSystemService(NotificationManager.class);
-        if (manager != null) manager.notify(NOTIFICATION_ID, buildNotification(false));
+        updateNotification("نام هم‌صدا شنیده شد؛ منتظر فرمان هستم.");
     }
 
     private void savePendingCommand(String command) {
@@ -293,28 +352,53 @@ public class WakeWordForegroundService extends Service {
                 .putString("pending_wake_command", command.trim())
                 .putLong("pending_wake_command_at", System.currentTimeMillis())
                 .apply();
-        NotificationManager manager = getSystemService(NotificationManager.class);
-        if (manager != null) manager.notify(NOTIFICATION_ID, buildNotification(true));
+        updateNotification("هم‌صدا · فرمان دریافت شد؛ برای اجرا وارد دستیار شو.");
     }
 
-    private void destroyRecognizer() {
-        SpeechRecognizer old = recognizer;
-        recognizer = null;
-        if (old != null) {
-            try { old.cancel(); } catch (Exception ignored) {}
-            try { old.destroy(); } catch (Exception ignored) {}
-        }
+    private void recoverContinuousRecognition() {
+        if (stopping || model == null) return;
+        try {
+            if (speechService != null) {
+                speechService.cancel();
+                speechService.shutdown();
+                speechService = null;
+            }
+            if (recognizer != null) {
+                recognizer.close();
+                recognizer = null;
+            }
+        } catch (Exception ignored) {}
+        startContinuousRecognition();
+    }
+
+    private void deleteRecursively(File file) {
+        if (file == null || !file.exists()) return;
+        File[] children = file.listFiles();
+        if (children != null) for (File child : children) deleteRecursively(child);
+        //noinspection ResultOfMethodCallIgnored
+        file.delete();
     }
 
     @Override public void onDestroy() {
         stopping = true;
-        handler.removeCallbacksAndMessages(null);
-        destroyRecognizer();
-        if (textToSpeech != null) {
-            try { textToSpeech.stop(); } catch (Exception ignored) {}
-            try { textToSpeech.shutdown(); } catch (Exception ignored) {}
-            textToSpeech = null;
-        }
+        modelExecutor.shutdownNow();
+        try {
+            if (speechService != null) {
+                speechService.cancel();
+                speechService.shutdown();
+                speechService = null;
+            }
+        } catch (Exception ignored) {}
+        try {
+            if (recognizer != null) {
+                recognizer.close();
+                recognizer = null;
+            }
+            if (model != null) {
+                model.close();
+                model = null;
+            }
+        } catch (Exception ignored) {}
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean("wake_word_enabled", false).apply();
         super.onDestroy();
     }
