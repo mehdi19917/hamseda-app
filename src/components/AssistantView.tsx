@@ -35,6 +35,8 @@ import {
   executeDeviceActionNative,
   isNativeAndroid,
   listenOncePersianNative,
+  startNativeWakeWordService,
+  stopNativeWakeWordService,
   stopListeningNative,
   type NativeCapabilities,
 } from '../services/nativeAndroidBridge';
@@ -416,86 +418,32 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     ]
   );
 
-  // Continuous hands-free Wake-Word Loop on Android APK
+  // Android owns the always-on wake-word lifecycle in a microphone foreground service.
   useEffect(() => {
+    if (!isNativeAndroid()) {
+      setIsWakeListening(false);
+      return;
+    }
+    let mounted = true;
     if (!wakeLoopEnabled) {
       setIsWakeListening(false);
-      stopListeningNative();
-      return;
+      void stopNativeWakeWordService();
+      void stopListeningNative();
+      return () => { mounted = false; };
     }
-    if (!isNativeAndroid()) {
-      return;
-    }
-    if (isSpeaking || isRecordingAudio || isListeningOnce || isBusy) {
-      setIsWakeListening(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    const runLoop = async () => {
-      while (!cancelled) {
-        setIsWakeListening(true);
-        const res = await listenOncePersianNative();
-        if (cancelled) break;
-
-        if (res.permissionRequired) {
-          onUpdateSettings({assistantWakeWordEnabled: false});
-          onStatusToast('برای گوش به زنگ بودن دستیار، مجوز میکروفون لازم است.');
-          break;
-        }
-
-        if (res.ok && res.transcript?.trim()) {
-          const transcript = res.transcript.trim();
-          const wakeCheck = extractCommandAfterWakeWord(transcript, assistantName);
-          // If awaiting SMS body/recipient, user doesn't need to repeat wake word
-          // In hands-free mode, never execute ambient speech as a command.
-          // Require the configured wake word, except when continuing a pending SMS flow.
-          const shouldRespond = wakeCheck.matched || Boolean(pendingIntent);
-
-          if (shouldRespond) {
-            setIsWakeListening(false);
-            await executeUtterance(transcript, true);
-            break;
-          }
-        }
-
-        // Small cooldown between SpeechRecognizer restarts
-        await new Promise((r) => setTimeout(r, 1200));
+    setIsWakeListening(true);
+    void startNativeWakeWordService(assistantName).then((result) => {
+      if (!mounted) return;
+      if (!result.ok) {
+        setIsWakeListening(false);
+        onUpdateSettings({assistantWakeWordEnabled: false});
+        onStatusToast(result.message || (result.permissionRequired
+          ? 'برای گوش‌به‌زنگ بودن، اجازه میکروفون لازم است.'
+          : 'سرویس گوش‌به‌زنگ شروع نشد. برنامه را باز نگه دارید و دوباره امتحان کنید.'));
       }
-      if (!cancelled) setIsWakeListening(false);
-    };
-
-    const timer = window.setTimeout(() => {
-      void runLoop();
-    }, 900);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-      setIsWakeListening(false);
-      if (!manualListenRef.current) {
-        void stopListeningNative();
-      }
-    };
-  }, [
-    wakeLoopEnabled,
-    isSpeaking,
-    isRecordingAudio,
-    isListeningOnce,
-    isBusy,
-    assistantName,
-    pendingIntent,
-    settings,
-    deviceOwner,
-    isOnline,
-    syncedContacts,
-    callers,
-    morningMessage,
-    executeUtterance,
-    onUpdateSettings,
-    onStatusToast,
-  ]);
+    });
+    return () => { mounted = false; };
+  }, [wakeLoopEnabled, assistantName, onUpdateSettings, onStatusToast]);
 
   const handleListenOnce = async () => {
     if (isListeningOnce) {
@@ -595,7 +543,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     onUpdateSettings({assistantWakeWordEnabled: next});
     onStatusToast(
       next
-        ? `دستیار «${assistantName}» گوش‌به‌زنگ شد؛ نامش را صدا بزنید تا پاسخ دهد.`
+        ? `در حال فعال‌کردن سرویس گوش‌به‌زنگ «${assistantName}» هستم؛ اعلان دائمی هم‌صدا نمایش داده می‌شود.`
         : 'گوش‌به‌زنگ خودکار دستیار خاموش شد (دکمه میکروفون همچنان فعال است).'
     );
   };
