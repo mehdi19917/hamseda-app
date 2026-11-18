@@ -25,6 +25,7 @@ export interface PendingAssistantIntent {
 
 export interface AssistantEngineContext {
   settings: AppSettings;
+  conversationHistory?: {role: 'user' | 'assistant'; text: string}[];
   deviceOwner: DeviceOwner;
   isOnline: boolean;
   syncedContacts: SyncedPhoneContact[];
@@ -659,6 +660,40 @@ export function parseOfflineAssistantCommand(
   return null;
 }
 
+
+function buildOfflineConversationReply(
+  utterance: string,
+  ctx: AssistantEngineContext
+): string {
+  const selfName = getSelfName(ctx.settings, ctx.deviceOwner);
+  const assistantName = ctx.settings.assistantName?.trim() || 'هم‌صدا';
+  const text = normalizeAssistantText(utterance);
+  const previousUser = [...(ctx.conversationHistory || [])].reverse().find((item) => item.role === 'user')?.text;
+
+  if (/^(سلام|درود|صبح بخیر|صبحت بخیر|عصر بخیر|شب بخیر)/.test(text)) {
+    return `سلام ${selfName} جان! خوش اومدی. من ${assistantName} هستم؛ بگو ببینم چه خبر؟`;
+  }
+  if (/(اسم تو چیه|اسمت چیه|تو کی هستی|خودتو معرفی کن)/.test(text)) {
+    return `من ${assistantName} هستم؛ دستیار شخصی تو. هم برای گفت‌وگو کنارتم، هم برای انجام کارهایی که روی گوشی در دسترسمه.`;
+  }
+  if (/(من کیم|اسم من چیه|منو می شناسی|منو میشناسی)/.test(text)) {
+    return `تو ${selfName} هستی. چیزهایی رو که در تنظیمات و حافظه همین برنامه ثبت شده می‌تونم به خاطر بیارم.`;
+  }
+  if (/(چه کار(هایی)? می تونی|چیکار می تونی|چه قابلیت|چه امکاناتی)/.test(text)) {
+    return 'می‌تونم بهت جواب بدم و در کارهای گوشی مثل تماس، پیامک با تأیید، باز کردن برنامه‌ها، آلارم و تنظیمات کمکت کنم. وقتی اینترنت وصل باشه، گفت‌وگوی آزاد و پرسش‌های گسترده‌تری هم دارم.';
+  }
+  if (/(خوبی|حالت چطوره|چه خبر)/.test(text)) {
+    return `خوبم، ممنون که پرسیدی ${selfName} جان! تو چطوری؟ امروز اوضاع چطوره؟`;
+  }
+  if (/(یادت هست|یادته|درباره چی حرف می زدیم|چی گفتم)/.test(text) && previousUser) {
+    return `آخرین چیزی که در این گفت‌وگو گفتی این بود: «${previousUser}». منظورت همون موضوعه؟`;
+  }
+  if (/^(ممنون|مرسی|دمت گرم|تشکر)/.test(text)) {
+    return `قربونت ${selfName} جان؛ هر وقت خواستی من اینجام.`;
+  }
+  return `${selfName} جان، حرفت رو شنیدم. الان موتور گفت‌وگوی آفلاینم هنوز نسخه پایه‌ست و برای جواب دقیق‌تر به اینترنت نیاز دارم. می‌تونی یکم واضح‌تر بگی منظورت چیه؟`;
+}
+
 export async function processAssistantUtterance(
   rawTranscript: string,
   ctx: AssistantEngineContext
@@ -679,10 +714,8 @@ export async function processAssistantUtterance(
   }
 
   if (!ctx.isOnline) {
-    return {
-      action: 'answer',
-      replyText: `${selfName} جان، الان اینترنت قطع است اما دستورات آفلاین مثل «ساعت چنده»، «به همسرم پیامک بده»، «با فلانی تماس بگیر»، «عکس بگیر»، «ضبط صدا»، «سایلنت کن» و «صدا را زیاد کن» فعال هستند.`,
-    };
+    const offlineReply = buildOfflineConversationReply(cleanedUtterance || rawTranscript.trim(), ctx);
+    return {action: 'answer', replyText: offlineReply};
   }
 
   const {timeStr, dateStr} = getCurrentPersianTimeAndDate();
@@ -741,11 +774,32 @@ export async function processAssistantUtterance(
       };
     }
 
+    if (result.action === 'answer') {
+      try {
+        const chatRes = await fetch(apiUrl('/api/assistant-chat'), {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            assistantName,
+            selfName,
+            partnerName: getPartnerNameForDevice(ctx.settings, ctx.deviceOwner),
+            userMessage: cleanedUtterance || rawTranscript.trim(),
+            history: (ctx.conversationHistory || []).slice(-12),
+          }),
+        });
+        const chatParsed = await safeReadJsonResponse<{replyText?: string; error?: string}>(chatRes);
+        const conversationalReply = chatParsed.data?.replyText?.trim();
+        if (chatRes.ok && conversationalReply) result.replyText = conversationalReply;
+      } catch (chatError) {
+        console.warn('Conversation engine unavailable; keeping command-router reply.', chatError);
+      }
+    }
+
     return result;
   } catch {
     return {
       action: 'answer',
-      replyText: `${selfName} جان، متاسفانه ارتباط با سرویس آنلاین برقرار نشد. می‌توانی دستورات مستقیم مثل ساعت، تماس، پیامک، دوربین، ضبط صدا یا تنظیم صدا را بگویی.`,
+      replyText: buildOfflineConversationReply(cleanedUtterance || rawTranscript.trim(), ctx),
     };
   }
 }
