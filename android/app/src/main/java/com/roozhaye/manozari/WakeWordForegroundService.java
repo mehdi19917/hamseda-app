@@ -190,7 +190,7 @@ public class WakeWordForegroundService extends Service {
 
                     @Override public void onError(int error) {
                         // Restart only the recognition session, not the recognizer service object.
-                        restartRecognition(error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ? 1800 : 500);
+                        restartRecognition(error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ? 1800 : 900);
                     }
 
                     @Override public void onResults(Bundle results) {
@@ -201,7 +201,7 @@ public class WakeWordForegroundService extends Service {
                         if (awaitingCommand) {
                             awaitingCommand = false;
                             if (!spoken.isEmpty()) savePendingCommand(spoken);
-                            restartRecognition(350);
+                            restartRecognition(900);
                             return;
                         }
 
@@ -227,8 +227,8 @@ public class WakeWordForegroundService extends Service {
             speech.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR");
             speech.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
             speech.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
-            speech.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2200L);
-            speech.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1400L);
+            speech.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L);
+            speech.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L);
             speech.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
             recognizer.startListening(speech);
         } catch (Exception e) {
@@ -245,10 +245,10 @@ public class WakeWordForegroundService extends Service {
         textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
             @Override public void onStart(String utteranceId) {}
             @Override public void onDone(String utteranceId) {
-                handler.post(() -> restartRecognition(250));
+                handler.post(() -> restartRecognition(900));
             }
             @Override public void onError(String utteranceId) {
-                handler.post(() -> restartRecognition(700));
+                handler.post(() -> restartRecognition(1200));
             }
         });
         textToSpeech.speak("جانم، بفرمایید", TextToSpeech.QUEUE_FLUSH, null, "hamseda-wake-prompt");
