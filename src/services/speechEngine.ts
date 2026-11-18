@@ -365,16 +365,24 @@ export async function generateAndCacheGeminiWav(params: {
   const persona = getPersonaInfo(voiceName);
   const style = [persona.tone, params.style ?? 'Fluent natural Tehran Persian voice.'].filter(Boolean).join(' ');
 
-  const res = await fetch(apiUrl('/api/tts'), {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 12000);
+  let res: Response;
+  try {
+    res = await fetch(apiUrl('/api/tts'), {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
+    signal: controller.signal,
     body: JSON.stringify({
       text: params.text,
       voiceName,
       style,
       forceRefresh: Boolean(params.forceRefresh),
     }),
-  });
+    });
+  } finally {
+    window.clearTimeout(timeout);
+  }
 
   const parsed = await safeReadJsonResponse<{
     audioBase64?: string;
@@ -472,7 +480,9 @@ export async function speakFluentPersian(
     }
 
     // 2. If online (or existing cached clip is legacy/fallback), fetch styled Studio Gemini WAV
-    if (navigator.onLine) {
+    {
+      // Do not trust navigator.onLine inside Android WebView; attempt the cloud TTS
+      // and fall back to the local engine only after a bounded network timeout.
       options.onLoading?.();
       try {
         const result = await generateAndCacheGeminiWav({
