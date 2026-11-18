@@ -173,6 +173,7 @@ export default function App() {
     return {
       ...DEFAULT_SETTINGS,
       ...saved,
+      defaultVoice: 'Kore',
       myName: normalizedMyName,
       partnerName: normalizedPartnerName,
       assistantName: normalizedAssistantName,
