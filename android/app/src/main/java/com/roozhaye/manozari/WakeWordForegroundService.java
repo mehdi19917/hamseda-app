@@ -12,13 +12,15 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
-import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -34,10 +36,14 @@ public class WakeWordForegroundService extends Service {
     private static final String PREFS = "rmz_native_prefs";
     private static final String ACTION_START = "com.roozhaye.manozari.WAKE_START";
     private static final String ACTION_STOP = "com.roozhaye.manozari.WAKE_STOP";
+
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SpeechRecognizer recognizer;
+    private TextToSpeech textToSpeech;
+    private boolean ttsReady = false;
     private boolean stopping = false;
     private boolean recognitionPending = false;
+    private boolean awaitingCommand = false;
     private String assistantName = "هم‌صدا";
     private long lastWakeAt = 0L;
 
@@ -57,21 +63,26 @@ public class WakeWordForegroundService extends Service {
     }
 
     public static void stop(Context context) {
-        Intent intent = new Intent(context, WakeWordForegroundService.class);
-        intent.setAction(ACTION_STOP);
-        try { context.startService(intent); } catch (RuntimeException ignored) {}
         context.stopService(new Intent(context, WakeWordForegroundService.class));
-        context.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean("wake_word_enabled", false).apply();
+        context.getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putBoolean("wake_word_enabled", false)
+                .remove("pending_wake_command")
+                .apply();
     }
 
-    @Override
-    public void onCreate() {
+    @Override public void onCreate() {
         super.onCreate();
         createChannel();
+        textToSpeech = new TextToSpeech(getApplicationContext(), status -> {
+            if (status == TextToSpeech.SUCCESS && textToSpeech != null) {
+                int languageResult = textToSpeech.setLanguage(new Locale("fa", "IR"));
+                ttsReady = languageResult != TextToSpeech.LANG_MISSING_DATA
+                        && languageResult != TextToSpeech.LANG_NOT_SUPPORTED;
+            }
+        });
     }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
+    @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
             stopSelf();
             return START_NOT_STICKY;
@@ -80,8 +91,10 @@ public class WakeWordForegroundService extends Service {
             String requestedName = intent.getStringExtra("assistant_name");
             if (requestedName != null && !requestedName.trim().isEmpty()) assistantName = requestedName.trim();
         } else {
-            assistantName = getSharedPreferences(PREFS, MODE_PRIVATE).getString("assistant_name", "هم‌صدا");
+            assistantName = getSharedPreferences(PREFS, MODE_PRIVATE)
+                    .getString("assistant_name", "هم‌صدا");
         }
+
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putBoolean("wake_word_enabled", true)
                 .putString("assistant_name", assistantName)
@@ -93,34 +106,38 @@ public class WakeWordForegroundService extends Service {
             return START_NOT_STICKY;
         }
 
-        Notification notification = buildNotification(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
+            startForeground(NOTIFICATION_ID, buildNotification(false),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
         } else {
-            startForeground(NOTIFICATION_ID, notification);
+            startForeground(NOTIFICATION_ID, buildNotification(false));
         }
+
         stopping = false;
         handler.removeCallbacksAndMessages(null);
         recognitionPending = false;
         destroyRecognizer();
-        restartRecognition(250);
+        restartRecognition(300);
         return START_STICKY;
     }
 
-    private Notification buildNotification(boolean heardWakeWord) {
+    private Notification buildNotification(boolean commandReady) {
         Intent open = new Intent(this, MainActivity.class);
         open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pending = PendingIntent.getActivity(this, 712, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        String title = commandReady ? "هم‌صدا · فرمان دریافت شد" : "هم‌صدا · گوش‌به‌زنگ";
+        String message = commandReady
+                ? "برای اجرای فرمان وارد دستیار شو."
+                : "صدایت را می‌شنوم؛ نام هم‌صدا را بگو.";
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_rmz)
-                .setContentTitle(heardWakeWord ? "هم‌صدا صدایت را شنید" : "هم‌صدا · گوش‌به‌زنگ")
-                .setContentText(heardWakeWord
-                        ? "برای گفتن فرمان، لمس کن و وارد دستیار شو."
-                        : "با گفتن «" + assistantName + "» دستیار را بیدار کن.")
+                .setContentTitle(title)
+                .setContentText(message)
                 .setContentIntent(pending)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .build();
     }
@@ -129,7 +146,7 @@ public class WakeWordForegroundService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
                     "گوش‌به‌زنگ هم‌صدا", NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("اعلان آشکار هنگام فعال بودن شنود واژه بیدارباش");
+            channel.setDescription("شنود آشکار واژه بیدارباش و دریافت فرمان صوتی");
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) manager.createNotificationChannel(channel);
         }
@@ -145,7 +162,8 @@ public class WakeWordForegroundService extends Service {
     }
 
     private void beginRecognition() {
-        if (stopping || !SpeechRecognizer.isRecognitionAvailable(this)) {
+        if (stopping) return;
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             restartRecognition(2500);
             return;
         }
@@ -154,6 +172,8 @@ public class WakeWordForegroundService extends Service {
             stopSelf();
             return;
         }
+
+        final boolean commandMode = awaitingCommand;
         destroyRecognizer();
         try {
             recognizer = SpeechRecognizer.createSpeechRecognizer(getApplicationContext());
@@ -168,26 +188,48 @@ public class WakeWordForegroundService extends Service {
 
                 @Override public void onError(int error) {
                     destroyRecognizer();
-                    restartRecognition(error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ? 1800 : 700);
+                    restartRecognition(error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ? 1800 : 900);
                 }
 
                 @Override public void onResults(Bundle results) {
                     ArrayList<String> matches = results == null ? null
                             : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                    String spoken = matches == null || matches.isEmpty() ? "" : matches.get(0);
-                    if (containsWakeWord(spoken)) onWakeWordHeard();
+                    String spoken = matches == null || matches.isEmpty() ? "" : matches.get(0).trim();
+
+                    if (commandMode) {
+                        awaitingCommand = false;
+                        if (!spoken.isEmpty()) savePendingCommand(spoken);
+                        destroyRecognizer();
+                        restartRecognition(900);
+                        return;
+                    }
+
+                    if (containsWakeWord(spoken)) {
+                        onWakeWordHeard();
+                        String command = extractCommandAfterWakeWord(spoken);
+                        if (!command.isEmpty()) {
+                            savePendingCommand(command);
+                        } else {
+                            awaitingCommand = true;
+                            destroyRecognizer();
+                            speakWakePrompt();
+                            return;
+                        }
+                    }
+
                     destroyRecognizer();
                     restartRecognition(900);
                 }
             });
+
             Intent speech = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             speech.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
             speech.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR");
             speech.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR");
             speech.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
             speech.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
-            speech.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L);
-            speech.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L);
+            speech.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2200L);
+            speech.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1400L);
             speech.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
             recognizer.startListening(speech);
         } catch (Exception e) {
@@ -196,27 +238,62 @@ public class WakeWordForegroundService extends Service {
         }
     }
 
+    private void speakWakePrompt() {
+        if (!ttsReady || textToSpeech == null) {
+            restartRecognition(700);
+            return;
+        }
+        textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+            @Override public void onStart(String utteranceId) {}
+            @Override public void onDone(String utteranceId) {
+                handler.post(() -> restartRecognition(250));
+            }
+            @Override public void onError(String utteranceId) {
+                handler.post(() -> restartRecognition(700));
+            }
+        });
+        textToSpeech.speak("جانم، بفرمایید", TextToSpeech.QUEUE_FLUSH, null, "hamseda-wake-prompt");
+    }
+
     private boolean containsWakeWord(String spoken) {
         String heard = normalize(spoken);
         String expected = normalize(assistantName);
-        if (heard.isEmpty() || expected.isEmpty()) return false;
-        if (heard.contains(expected)) return true;
-        return false;
+        return !heard.isEmpty() && !expected.isEmpty() && heard.contains(expected);
+    }
+
+    private String extractCommandAfterWakeWord(String spoken) {
+        String expected = normalize(assistantName);
+        if (expected.isEmpty()) return "";
+        for (int i = 0; i < spoken.length(); i++) {
+            if (normalize(spoken.substring(0, i + 1)).contains(expected)) {
+                return spoken.substring(i + 1).replaceFirst("^[\\s،,:;.!؟\\-]+", "").trim();
+            }
+        }
+        return "";
     }
 
     private String normalize(String value) {
         if (value == null) return "";
-        String normalized = Normalizer.normalize(value, Normalizer.Form.NFKC)
+        return Normalizer.normalize(value, Normalizer.Form.NFKC)
                 .replace('ي', 'ی').replace('ك', 'ک')
                 .replace("‌", "").replaceAll("[\\s\\p{Punct}]+", "")
                 .toLowerCase(Locale.ROOT);
-        return normalized;
     }
 
     private void onWakeWordHeard() {
         long now = System.currentTimeMillis();
-        if (now - lastWakeAt < 12000L) return;
+        if (now - lastWakeAt < 2500L) return;
         lastWakeAt = now;
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager != null) manager.notify(NOTIFICATION_ID, buildNotification(false));
+    }
+
+    private void savePendingCommand(String command) {
+        if (command == null || command.trim().isEmpty()) return;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putString("pending_wake_command", command.trim())
+                .putLong("pending_wake_command_at", System.currentTimeMillis())
+                .apply();
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null) manager.notify(NOTIFICATION_ID, buildNotification(true));
     }
@@ -234,6 +311,11 @@ public class WakeWordForegroundService extends Service {
         stopping = true;
         handler.removeCallbacksAndMessages(null);
         destroyRecognizer();
+        if (textToSpeech != null) {
+            try { textToSpeech.stop(); } catch (Exception ignored) {}
+            try { textToSpeech.shutdown(); } catch (Exception ignored) {}
+            textToSpeech = null;
+        }
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean("wake_word_enabled", false).apply();
         super.onDestroy();
     }
