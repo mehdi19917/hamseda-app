@@ -180,7 +180,7 @@ export function parseOfflineAssistantCommand(
   ctx: AssistantEngineContext
 ): AssistantCommandResult | null {
   const selfName = getSelfName(ctx.settings, ctx.deviceOwner);
-  const assistantName = ctx.settings.assistantName?.trim() || 'آوا';
+  const assistantName = ctx.settings.assistantName?.trim() || 'هم‌صدا';
   const wake = extractCommandAfterWakeWord(rawTranscript, assistantName);
 
   if (wake.matched && wake.onlyWakeWord) {
@@ -639,7 +639,7 @@ export async function processAssistantUtterance(
   ctx: AssistantEngineContext
 ): Promise<AssistantCommandResult> {
   const selfName = getSelfName(ctx.settings, ctx.deviceOwner);
-  const assistantName = ctx.settings.assistantName?.trim() || 'آوا';
+  const assistantName = ctx.settings.assistantName?.trim() || 'هم‌صدا';
   const wake = extractCommandAfterWakeWord(rawTranscript, assistantName);
   const cleanedUtterance = wake.matched ? wake.command : rawTranscript.trim();
 
