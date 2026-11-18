@@ -81,8 +81,8 @@ export function useBackgroundScheduler(params: {
           const reg = await navigator.serviceWorker.ready;
           await reg.showNotification(title, {
             body,
-            icon: '/pwa-192x192.png',
-            badge: '/pwa-192x192.png',
+            icon: '/icon.svg',
+            badge: '/icon.svg',
             dir: 'rtl',
             lang: 'fa',
             tag: `rmz-${scheduleId}`,
@@ -92,7 +92,7 @@ export function useBackgroundScheduler(params: {
         }
         new Notification(title, {
           body,
-          icon: '/pwa-192x192.png',
+          icon: '/icon.svg',
           dir: 'rtl',
           lang: 'fa',
         });
@@ -131,7 +131,7 @@ export function useBackgroundScheduler(params: {
         title: 'زمان‌بند هوشمند هم‌صدا',
         artist: 'فعال در پس‌زمینه برای اعلام پیام صبحگاهی و اهداف',
         album: 'هم‌صدا',
-        artwork: [{src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png'}],
+        artwork: [{src: '/icon.svg', sizes: 'any', type: 'image/svg+xml'}],
       });
     }
 
