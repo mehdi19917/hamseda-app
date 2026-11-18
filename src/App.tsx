@@ -162,6 +162,10 @@ export default function App() {
       typeof saved.myName === 'string' && saved.myName.trim() && saved.myName.trim() !== 'مهدی'
         ? saved.myName.trim()
         : 'من';
+    const normalizedPartnerName =
+      typeof saved.partnerName === 'string' && saved.partnerName.trim() && saved.partnerName.trim() !== 'زری'
+        ? saved.partnerName.trim()
+        : 'همراه';
     const normalizedAssistantName =
       typeof saved.assistantName === 'string' && saved.assistantName.trim()
         ? saved.assistantName.trim()
