@@ -75,8 +75,8 @@ export function writeDeviceOwner(owner: DeviceOwner): void {
 }
 
 export function getSelfName(settings: Pick<AppSettings, 'myName' | 'partnerName'>, deviceOwner: DeviceOwner): string {
-  const man = settings.myName?.trim() || 'بهمن';
-  const zari = settings.partnerName?.trim() || 'زری';
+  const man = settings.myName?.trim() || 'من';
+  const zari = settings.partnerName?.trim() || 'همراه';
   return deviceOwner === 'zari' ? zari : man;
 }
 
@@ -91,8 +91,7 @@ export function getPartnerNameForDevice(
 
 /**
  * Returns the couple names ordered so the current phone's owner is always addressed FIRST.
- * - Bahman's phone: "بهمن و زری"
- * - Zari's phone: "زری و بهمن"
+ * The current device owner is always addressed first.
  */
 export function getOrderedPairNames(
   settings: Pick<AppSettings, 'myName' | 'partnerName'>,
@@ -104,8 +103,7 @@ export function getOrderedPairNames(
 }
 
 /**
- * Adapts shared/offline texts so phrases like «من و زری» or «بهمن و زری»
- * naturally address the current device owner first when running on Zari's phone.
+ * Adapts shared/offline texts so the current device owner is addressed first.
  */
 export function adaptTextForDevice(
   text: string,
