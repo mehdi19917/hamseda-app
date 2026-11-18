@@ -305,8 +305,10 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
           pendingIntent,
         });
 
-        // Update conversation pending state
-        if (result.action === 'ask_sms_body') {
+        // Stage every SMS for review; do not execute it on the first pass.
+        if (result.action === 'send_sms' && pendingIntent?.type !== 'awaiting_sms_confirmation') {
+          setPendingIntent({type: 'awaiting_sms_confirmation', targetName: result.targetName || result.targetPhone || 'مخاطب نامشخص', targetPhone: result.targetPhone, smsBody: result.smsBody || ''});
+        } else if (result.action === 'ask_sms_body') {
           if (result.targetPhone) {
             setPendingIntent({
               type: 'awaiting_sms_body',
@@ -322,8 +324,10 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
 
         let finalReply = result.replyText;
 
+        if (result.action === 'send_sms' && pendingIntent?.type !== 'awaiting_sms_confirmation') finalReply = 'قبل از ارسال، نام مخاطب و متن پیام را بررسی و تأیید کن.';
+
         // Execute Android Hardware/OS Action if applicable
-        if (NATIVE_DEVICE_ACTIONS.has(result.action)) {
+        if (NATIVE_DEVICE_ACTIONS.has(result.action) && !(result.action === 'send_sms' && pendingIntent?.type !== 'awaiting_sms_confirmation')) {
           const shouldSkipAutoDownloadIfSearch =
             result.action === 'download_url' && !result.downloadUrl?.trim();
 
@@ -727,10 +731,18 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
       {pendingIntent && (
         <section className="rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/70 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="text-sm text-amber-950 dark:text-amber-100">
-            {pendingIntent.type === 'awaiting_sms_body' ? (
+            {pendingIntent.type === 'awaiting_sms_confirmation' ? (
+              <>
+                <strong>بررسی نهایی پیامک</strong>
+                <div className="mt-2">گیرنده: <b>{pendingIntent.targetName}</b></div>
+                <div className="mt-1 break-words">شماره: <b dir="ltr">{pendingIntent.targetPhone || 'نامشخص'}</b></div>
+                <div className="mt-1 whitespace-pre-wrap">متن پیام: «{pendingIntent.smsBody}»</div>
+                <div className="mt-2 font-semibold">فقط اگر همه موارد درست است، تأیید و ارسال را بزن.</div>
+              </>
+            ) : pendingIntent.type === 'awaiting_sms_body' ? (
               <>
                 <strong>در انتظار متن پیامک به {pendingIntent.targetName}:</strong>{' '}
-                متن پیامک را بگویید یا در کادر زیر تایپ کنید تا ارسال شود.
+                متن پیامک را بگو یا تایپ کن؛ قبل از ارسال تأیید نهایی می‌گیری.
               </>
             ) : (
               <>
@@ -738,16 +750,10 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
               </>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setPendingIntent(null);
-              appendMessage('assistant', 'ارسال پیامک لغو شد.');
-            }}
-            className="min-h-[44px] px-4 rounded-xl border border-amber-400 dark:border-amber-700 text-xs font-semibold text-amber-900 dark:text-amber-200 cursor-pointer shrink-0"
-          >
-            لغو پیامک
-          </button>
+          <div className="flex flex-wrap gap-2 shrink-0">
+            {pendingIntent.type === 'awaiting_sms_confirmation' && <button type="button" onClick={() => executeUtterance('تأیید ارسال پیامک', false)} className="min-h-[44px] px-4 rounded-xl bg-green-600 text-white text-xs font-semibold cursor-pointer">تأیید و ارسال</button>}
+            <button type="button" onClick={() => { setPendingIntent(null); appendMessage('assistant', 'ارسال پیامک لغو شد.'); }} className="min-h-[44px] px-4 rounded-xl border border-amber-400 dark:border-amber-700 text-xs font-semibold text-amber-900 dark:text-amber-200 cursor-pointer shrink-0">لغو پیامک</button>
+          </div>
         </section>
       )}
 
