@@ -142,11 +142,17 @@ export function extractCommandAfterWakeWord(
   transcript: string,
   assistantName: string
 ): {matched: boolean; onlyWakeWord: boolean; command: string} {
-  const cleanName = normalizeAssistantText(assistantName || 'آوا');
+  const cleanName = normalizeAssistantText(assistantName || 'هم‌صدا');
   const norm = normalizeAssistantText(transcript);
   if (!norm) return {matched: false, onlyWakeWord: false, command: ''};
 
   const aliases = new Set<string>([cleanName]);
+  if (cleanName === 'هم صدا' || cleanName === 'همصدا') {
+    aliases.add('هم صدا');
+    aliases.add('همصدا');
+    aliases.add('هم‌صدا');
+    aliases.add('hamseda');
+  }
   if (cleanName === 'اوا' || cleanName === 'آوا') {
     aliases.add('اوا');
     aliases.add('آوا');
@@ -160,11 +166,11 @@ export function extractCommandAfterWakeWord(
     }
     const idx = norm.indexOf(alias);
     if (idx !== -1) {
-      const after = transcript
+      const after = norm
         .slice(idx + alias.length)
         .replace(/^[\s،,:؛.!؟-]+/, '')
         .trim();
-      const before = transcript.slice(0, idx).replace(/^(سلام|هی|بگو)\s+/i, '').trim();
+      const before = norm.slice(0, idx).replace(/^(سلام|هی|بگو)\s+/i, '').trim();
       const combined = after || before;
       return {
         matched: true,
