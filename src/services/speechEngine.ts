@@ -9,7 +9,7 @@ import {
   isRiffWavBuffer,
   saveAudioClip,
 } from './audioLibraryDb';
-import {isNativeAndroid, precacheNativeWav, speakNativeBilingual, stopNativeAudio} from './nativeAndroidBridge';
+import {isNativeAndroid, precacheNativeWav, speakNativeBilingual, speakOfflineNeuralPersian, stopNativeAudio} from './nativeAndroidBridge';
 
 let sharedAudioCtx: AudioContext | null = null;
 let activeSourceNode: AudioBufferSourceNode | null = null;
@@ -528,7 +528,10 @@ export async function speakFluentPersian(
     options.onStart?.('offline-speech');
     let ok = false;
     if (isNativeAndroid()) {
-      ok = await speakNativeBilingual(options.text, persona.gender, rate);
+      // The neural Persian model is strictly an offline fallback. Cloud voices (Negin/Nasim/etc.)
+      // above remain untouched and keep priority whenever the online TTS endpoint responds.
+      ok = await speakOfflineNeuralPersian(options.text, rate);
+      if (!ok) ok = await speakNativeBilingual(options.text, persona.gender, rate);
       if (token !== playbackToken) return 'offline-speech';
     }
     if (!ok) {
