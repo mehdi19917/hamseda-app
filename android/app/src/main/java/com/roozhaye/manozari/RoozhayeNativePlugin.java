@@ -1515,6 +1515,27 @@ public class RoozhayeNativePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void speakOfflineNeuralPersian(PluginCall call) {
+        String text = call.getString("text", "");
+        Double rateValue = call.getDouble("rate", 1.0);
+        float rate = rateValue != null ? rateValue.floatValue() : 1.0f;
+        if (text == null || text.trim().isEmpty()) {
+            JSObject result = new JSObject();
+            result.put("ok", false);
+            result.put("error", "متن خالی است.");
+            call.resolve(result);
+            return;
+        }
+        new Thread(() -> {
+            boolean ok = OfflinePersianTts.speak(getContext(), text, rate);
+            JSObject result = new JSObject();
+            result.put("ok", ok);
+            if (!ok) result.put("error", "موتور عصبی آفلاین فارسی آماده نیست یا نتوانست صدا تولید کند.");
+            mainHandler.post(() -> call.resolve(result));
+        }, "HamsedaOfflinePersianTTS").start();
+    }
+
+    @PluginMethod
     public void speakNativeBilingual(PluginCall call) {
         String text = call.getString("text", "");
         String gender = call.getString("gender", "female");
