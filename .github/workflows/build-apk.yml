@@ -52,6 +52,23 @@ jobs:
           chmod 600 "$HOME/.android/debug.keystore"
           keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey
 
+      - name: Provision offline Persian neural TTS assets
+        run: |
+          mkdir -p android/app/libs android/app/src/main/assets/offline_tts/gyro
+          curl -L --fail --retry 3 "https://huggingface.co/csukuangfj/sherpa-onnx-libs/resolve/main/android/aar/sherpa-onnx-1.10.41.aar" -o android/app/libs/sherpa-onnx.aar
+          curl -L --fail --retry 3 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-fa_IR-gyro-medium.tar.bz2" -o /tmp/gyro.tar.bz2
+          mkdir -p /tmp/gyro && tar -xjf /tmp/gyro.tar.bz2 -C /tmp/gyro
+          MODEL="$(find /tmp/gyro -name 'fa_IR-gyro-medium.onnx' -type f | head -n 1)"
+          TOKENS="$(find /tmp/gyro -name 'tokens.txt' -type f | head -n 1)"
+          test -n "$MODEL" && test -n "$TOKENS"
+          cp "$MODEL" android/app/src/main/assets/offline_tts/gyro/model.onnx
+          cp "$TOKENS" android/app/src/main/assets/offline_tts/gyro/tokens.txt
+          curl -L --fail --retry 3 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2" -o /tmp/espeak-ng-data.tar.bz2
+          tar -xjf /tmp/espeak-ng-data.tar.bz2 -C android/app/src/main/assets/offline_tts/
+          test -s android/app/src/main/assets/offline_tts/gyro/model.onnx
+          test -s android/app/src/main/assets/offline_tts/gyro/tokens.txt
+          test -d android/app/src/main/assets/offline_tts/espeak-ng-data
+
       - name: Install dependencies and build web bundle
         run: |
           npm install --legacy-peer-deps
