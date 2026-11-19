@@ -93,7 +93,7 @@ interface RoozhayeNativePlugin {
     error?: string;
   }>;
   saveLearnedPhonetics(options: {phoneticsJson: string}): Promise<{ok: boolean; count?: number}>;
-  speakNativeBilingual(options: {text: string; gender: 'male' | 'female'; rate: number}): Promise<{ok: boolean}>;
+  speakOfflineNeuralPersian(options: {text: string; rate: number}): Promise<{ok: boolean; error?: string}>;\n  speakNativeBilingual(options: {text: string; gender: 'male' | 'female'; rate: number}): Promise<{ok: boolean}>;
   testNativeCallAnnouncement(options: {name: string; script: string; gender: 'male' | 'female'; voiceName?: string}): Promise<{ok: boolean}>;
   testNativeSmsAnnouncement(options: {sender: string; body: string; gender: 'male' | 'female'; voiceName?: string}): Promise<{ok: boolean}>;
   setDeviceIdentity(options: {
@@ -404,6 +404,16 @@ export async function syncSchedulesToNative(
     await RoozhayeNative.syncSchedules({schedulesJson: JSON.stringify(payload)});
   } catch {
     // ignore
+  }
+}
+
+export async function speakOfflineNeuralPersian(text: string, rate = 1): Promise<boolean> {
+  if (!isNativeAndroid()) return false;
+  try {
+    const result = await RoozhayeNative.speakOfflineNeuralPersian({text, rate});
+    return Boolean(result.ok);
+  } catch {
+    return false;
   }
 }
 
