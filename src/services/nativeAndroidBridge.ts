@@ -93,7 +93,8 @@ interface RoozhayeNativePlugin {
     error?: string;
   }>;
   saveLearnedPhonetics(options: {phoneticsJson: string}): Promise<{ok: boolean; count?: number}>;
-  speakOfflineNeuralPersian(options: {text: string; rate: number}): Promise<{ok: boolean; error?: string}>;\n  speakNativeBilingual(options: {text: string; gender: 'male' | 'female'; rate: number}): Promise<{ok: boolean}>;
+  speakOfflineNeuralPersian(options: {text: string; rate: number}): Promise<{ok: boolean; error?: string}>;
+  speakNativeBilingual(options: {text: string; gender: 'male' | 'female'; rate: number}): Promise<{ok: boolean}>;
   testNativeCallAnnouncement(options: {name: string; script: string; gender: 'male' | 'female'; voiceName?: string}): Promise<{ok: boolean}>;
   testNativeSmsAnnouncement(options: {sender: string; body: string; gender: 'male' | 'female'; voiceName?: string}): Promise<{ok: boolean}>;
   setDeviceIdentity(options: {
